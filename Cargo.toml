@@ -1,0 +1,4 @@
+[package]
+name = "aws-abacus"
+version = "0.1.0"
+authors = ["Eric D. Reichert <eric@reichertconsulting.com>"]
