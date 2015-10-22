@@ -12,29 +12,30 @@ fn main() {
                             .unwrap_or_else(|e| e.exit());
 
     let log_location = &path::Path::new(&args.arg_log_location);
-
-    let mut file_count = 0;
-    walk_fs(log_location, &|dir| {
-        // file_count += 1;
-    });
-
-    println!("Found {:?} files.", file_count);
+    let mut filenames = Vec::new();
+    match file_list(log_location, &mut filenames){
+        Ok(_) => {
+            let file_count = filenames.len();
+            println!("Found {:?} files.", file_count);
+        },
+        Err(e) => println!("An error occurred."),
+    };
 }
 
-fn walk_fs(dir: &path::Path, cb: &Fn(&fs::DirEntry)) -> io::Result<()> {
+fn file_list(dir: &path::Path, filenames: &mut Vec<fs::DirEntry>) -> Result<(), io::Error> {
     if try!(fs::metadata(dir)).is_dir() {
         for entry in try!(fs::read_dir(dir)) {
             let entry = try!(entry);
             if try!(fs::metadata(entry.path())).is_dir() {
-                try!(walk_fs(&entry.path(), cb));
+                try!(file_list(&entry.path(), filenames));
             } else {
-                cb(&entry);
+                filenames.push(entry)
             }
         }
     }
+
     Ok(())
 }
-
 const USAGE: &'static str = "
 aws-abacus
 
