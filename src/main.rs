@@ -15,11 +15,17 @@ fn main() {
                             .unwrap_or_else(|e| e.exit());
 
     let log_location = &path::Path::new(&args.arg_log_location);
+    let debug = args.flag_debug;
+    if debug {
+        println!("WARNING: RUNNING IN DEBUG MODE.");
+    }
+
     let mut filenames = Vec::new();
     match file_list(log_location, &mut filenames){
         Ok(_) => {
-            // let file_count = filenames.len();
-            // println!("Found {:?} files.", file_count);
+            if debug {
+                println!("DEBUG: Found {:?} files.", filenames.len());
+            }
             let mut line_count = 0;
             for filename in filenames {
                 match File::open(filename.path()) {
@@ -58,14 +64,31 @@ fn file_list(dir: &path::Path, filenames: &mut Vec<fs::DirEntry>) -> Result<(), 
 
     Ok(())
 }
+
 const USAGE: &'static str = "
 aws-abacus
 
 Usage:
   aws-abacus <log-location>
+  aws-abacus (-d | --debug) <log-location>
+  aws-abacus (-h | --help)
+
+Options:
+  -h --help     Show this screen.
+  -d --debug    Turn on debug output
 ";
 
 #[derive(Debug, RustcDecodable)]
 struct Args {
     arg_log_location: String,
+    flag_debug: bool,
 }
+
+// macro_rules! println_stderr(
+//     ($($arg:tt)*) => (
+//         match writeln!(&mut ::std::io::stderr(), $($arg)* ) {
+//             Ok(_) => {},
+//             Err(x) => panic!("Unable to write to stderr: {}", x),
+//         }
+//     )
+// );
