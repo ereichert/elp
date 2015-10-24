@@ -5,6 +5,9 @@ use docopt::Docopt;
 use std::fs;
 use std::path;
 use std::io;
+use std::fs::File;
+use std::io::BufReader;
+use std::io::BufRead;
 
 fn main() {
     let args: Args = Docopt::new(USAGE)
@@ -15,8 +18,27 @@ fn main() {
     let mut filenames = Vec::new();
     match file_list(log_location, &mut filenames){
         Ok(_) => {
-            let file_count = filenames.len();
-            println!("Found {:?} files.", file_count);
+            // let file_count = filenames.len();
+            // println!("Found {:?} files.", file_count);
+            let mut line_count = 0;
+            for filename in filenames {
+                match File::open(filename.path()) {
+                    Ok(file) => {
+                        let buffered_file = BufReader::new(&file);
+                        // let lines = buffered_file.lines();
+                        // for line in lines {
+                        //     // let l = line.unwrap();
+                        //     // println!("{}", l);
+                        //
+                        // }
+                        line_count += buffered_file.lines().count();
+                    },
+                    Err(e) => {
+                        println!("{}", e);
+                    }
+                }
+            }
+            println!("Found {:?} lines.", line_count);
         },
         Err(e) => println!("An error occurred."),
     };
