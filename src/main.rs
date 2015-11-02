@@ -9,24 +9,35 @@ use std::fs::File;
 use std::io::BufReader;
 use std::io::BufRead;
 
+macro_rules! debug {
+    ($debug:ident, $fmt:expr, $($arg:tt)*) => {
+        if $debug {
+            use std::io::Write;
+            match writeln!(&mut ::std::io::stderr(), concat!("DEBUG: ", $fmt), $($arg)*) {
+                Ok(_) => {},
+                Err(x) => panic!("Unable to write to stderr: {}", x),
+            }
+        }
+    };
+
+    ($debug:ident, $msg:expr) => { debug!($debug, $msg, ) }
+}
+
 fn main() {
     let args: Args = Docopt::new(USAGE)
                             .and_then(|d| d.decode())
                             .unwrap_or_else(|e| e.exit());
 
-    let log_location = &path::Path::new(&args.arg_log_location);
     let debug = args.flag_debug;
-    if debug {
-        println!("WARNING: RUNNING IN DEBUG MODE.");
-    }
+
+    let log_location = &path::Path::new(&args.arg_log_location);
+    debug!(debug, "Running summary on {}.", log_location.to_str().unwrap());
 
     let mut filenames = Vec::new();
     match file_list(log_location, &mut filenames){
         Ok(_) => {
-            if debug {
-                println!("DEBUG: Found {:?} files.", filenames.len());
-            }
-            let mut line_count = 0;
+            debug!(debug, "DEBUG: Found {} files.", filenames.len());
+            let mut record_count = 0;
             for filename in filenames {
                 match File::open(filename.path()) {
                     Ok(file) => {
@@ -37,14 +48,14 @@ fn main() {
                         //     // println!("{}", l);
                         //
                         // }
-                        line_count += buffered_file.lines().count();
+                        record_count += buffered_file.lines().count();
                     },
                     Err(e) => {
                         println!("{}", e);
                     }
                 }
             }
-            println!("Found {:?} lines.", line_count);
+            debug!(debug, "Found {} records.", record_count);
         },
         Err(e) => println!("An error occurred."),
     };
@@ -83,12 +94,3 @@ struct Args {
     arg_log_location: String,
     flag_debug: bool,
 }
-
-// macro_rules! println_stderr(
-//     ($($arg:tt)*) => (
-//         match writeln!(&mut ::std::io::stderr(), $($arg)* ) {
-//             Ok(_) => {},
-//             Err(x) => panic!("Unable to write to stderr: {}", x),
-//         }
-//     )
-// );
