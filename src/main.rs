@@ -24,7 +24,7 @@ fn main() {
     let mut filenames = Vec::new();
     match file_list(log_location, &mut filenames){
         Ok(_) => {
-            debug!(debug, "DEBUG: Found {} files.", filenames.len());
+            debug!(debug, "Found {} files.", filenames.len());
             let mut record_count = 0;
             for filename in filenames {
                 match File::open(filename.path()) {
