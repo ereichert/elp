@@ -6,3 +6,5 @@ authors = ["Eric D. Reichert <eric@reichertconsulting.com>"]
 [dependencies]
 docopt = "0.6"
 rustc-serialize = "0.3"
+gag = "0.1.6"
+lazy_static = "0.1.15"

@@ -20,32 +20,52 @@ macro_rules! debug {
 
 #[cfg(test)]
 mod test {
+    extern crate gag;
+
     use std::fmt::Write;
+    use std::io::Read;
+    use self::gag::BufferRedirect;
+    use std::sync::{Mutex};
+
+    //Gag only allows one redirect per output channel at a time.  Since the tests run in
+    //parallel I need a way to synchronize the redirect.  Hence, the mutex.
+    lazy_static! {
+        static ref STDERR_MUTEX: Mutex<()> = Mutex::new(());
+    }
 
     #[test]
     fn debug_should_write_a_message_without_format_args_to_the_dest() {
-        let mut buff = String::new();
+        let _l = STDERR_MUTEX.lock().unwrap();
+        let mut buff = BufferRedirect::stderr().unwrap();
 
-        write_log!(&mut buff, true, "DEBUG", "This is a test without format args.", );
+        debug!(true, "This is a test without format args.");
 
-        assert_eq!(buff, "DEBUG: This is a test without format args.\n");
+        let mut output = String::new();
+        buff.read_to_string(&mut output).unwrap();
+        assert_eq!(&output[..], "DEBUG: This is a test without format args.\n");
     }
 
     #[test]
     fn debug_should_write_a_message_with_one_format_arg_to_the_dest() {
-        let mut buff = String::new();
+        let _l = STDERR_MUTEX.lock().unwrap();
+        let mut buff = BufferRedirect::stderr().unwrap();
 
-        write_log!(&mut buff, true, "DEBUG", "This is a test with {} format arg.", "one");
+        debug!(true, "This is a test with {} format arg.", "one");
 
-        assert_eq!(buff, "DEBUG: This is a test with one format arg.\n");
+        let mut output = String::new();
+        buff.read_to_string(&mut output).unwrap();
+        assert_eq!(&output[..], "DEBUG: This is a test with one format arg.\n");
     }
 
     #[test]
     fn debug_should_write_a_message_with_format_args_to_the_dest() {
-        let mut buff = String::new();
+        let _l = STDERR_MUTEX.lock().unwrap();
+        let mut buff = BufferRedirect::stderr().unwrap();
 
-        write_log!(&mut buff, true, "DEBUG", "This is a test with {} {}.", "format", "args");
+        debug!(true, "This is a test with {} {}.", "format", "args");
 
-        assert_eq!(buff, "DEBUG: This is a test with format args.\n");
+        let mut output = String::new();
+        buff.read_to_string(&mut output).unwrap();
+        assert_eq!(&output[..], "DEBUG: This is a test with format args.\n");
     }
 }
