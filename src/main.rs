@@ -2,14 +2,15 @@ extern crate rustc_serialize;
 extern crate docopt;
 #[macro_use]
 extern crate aws_abacus;
+extern crate walkdir;
 
 use docopt::Docopt;
-use std::fs;
 use std::path;
 use std::io;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::BufRead;
+use walkdir::WalkDir;
 
 fn main() {
     let args: Args = Docopt::new(USAGE)
@@ -27,6 +28,7 @@ fn main() {
             debug!(debug, "Found {} files.", filenames.len());
             let mut record_count = 0;
             for filename in filenames {
+                debug!(debug, "Processing file {}.", filename.path().display());
                 match File::open(filename.path()) {
                     Ok(file) => {
                         let buffered_file = BufReader::new(&file);
@@ -36,7 +38,9 @@ fn main() {
                         //     // println!("{}", l);
                         //
                         // }
-                        record_count += buffered_file.lines().count();
+                        let current_file_count = buffered_file.lines().count();
+                        record_count += current_file_count;
+                        debug!(debug, "Found {} records.", current_file_count);
                     },
                     Err(e) => {
                         println!("{}", e);
@@ -49,18 +53,11 @@ fn main() {
     };
 }
 
-fn file_list(dir: &path::Path, filenames: &mut Vec<fs::DirEntry>) -> Result<(), io::Error> {
-    if try!(fs::metadata(dir)).is_dir() {
-        for entry in try!(fs::read_dir(dir)) {
-            let entry = try!(entry);
-            if try!(fs::metadata(entry.path())).is_dir() {
-                try!(file_list(&entry.path(), filenames));
-            } else {
-                filenames.push(entry)
-            }
-        }
+fn file_list(dir: &path::Path, filenames: &mut Vec<walkdir::DirEntry>) -> Result<(), io::Error> {
+    for entry in WalkDir::new(dir).min_depth(1) {
+        let entry = entry.unwrap();
+        filenames.push(entry);
     }
-
     Ok(())
 }
 
