@@ -3,3 +3,4 @@
 extern crate lazy_static;
 
 mod logging;
+pub mod elb_log_files;

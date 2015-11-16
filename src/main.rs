@@ -2,15 +2,13 @@ extern crate rustc_serialize;
 extern crate docopt;
 #[macro_use]
 extern crate aws_abacus;
-extern crate walkdir;
 
 use docopt::Docopt;
 use std::path;
-use std::io;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::BufRead;
-use walkdir::WalkDir;
+use aws_abacus::elb_log_files;
 
 fn main() {
     let args: Args = Docopt::new(USAGE)
@@ -23,7 +21,7 @@ fn main() {
     debug!(debug, "Running summary on {}.", log_location.to_str().unwrap());
 
     let mut filenames = Vec::new();
-    match file_list(log_location, &mut filenames){
+    match elb_log_files::file_list(log_location, &mut filenames) {
         Ok(_) => {
             debug!(debug, "Found {} files.", filenames.len());
             let mut record_count = 0;
@@ -51,14 +49,6 @@ fn main() {
         },
         Err(e) => println!("An error occurred."),
     };
-}
-
-fn file_list(dir: &path::Path, filenames: &mut Vec<walkdir::DirEntry>) -> Result<(), io::Error> {
-    for entry in WalkDir::new(dir).min_depth(1) {
-        let entry = entry.unwrap();
-        filenames.push(entry);
-    }
-    Ok(())
 }
 
 const USAGE: &'static str = "
