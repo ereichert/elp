@@ -17,8 +17,10 @@ fn main() {
                             .and_then(|d| d.decode())
                             .unwrap_or_else(|e| e.exit());
 
-    let debug = args.flag_debug;
-
+    let runtime_context = RuntimeContext {
+        debug: args.flag_debug,
+    };
+    let debug = runtime_context.debug;
     let log_location = &path::Path::new(&args.arg_log_location);
     debug!(debug, "Running summary on {}.", log_location.to_str().unwrap());
 
@@ -26,17 +28,22 @@ fn main() {
     match elb_log_files::file_list(log_location, &mut filenames) {
         Ok(_) => {
             debug!(debug, "Found {} files.", filenames.len());
-            let record_count = handle_files(filenames);
+            let record_count = handle_files(&runtime_context, filenames);
             debug!(debug, "Found {} records.", record_count);
         },
         Err(e) => println!("An error occurred."),
     };
 }
 
-fn handle_files(filenames: Vec<walkdir::DirEntry>) -> usize {
+struct RuntimeContext {
+    debug: bool,
+}
+
+fn handle_files(runtime_context: &RuntimeContext, filenames: Vec<walkdir::DirEntry>) -> usize {
+    let debug = runtime_context.debug;
     let mut record_count = 0;
     for filename in filenames {
-        // debug!(debug, "Processing file {}.", filename.path().display());
+        debug!(debug, "Processing file {}.", filename.path().display());
         match File::open(filename.path()) {
             Ok(file) => {
                 let buffered_file = BufReader::new(&file);
@@ -48,7 +55,7 @@ fn handle_files(filenames: Vec<walkdir::DirEntry>) -> usize {
                 // }
                 let current_file_count = buffered_file.lines().count();
                 record_count += current_file_count;
-                // debug!(debug, "Found {} records.", current_file_count);
+                debug!(debug, "Found {} records.", current_file_count);
             },
             Err(e) => {
                 println!("{}", e);
