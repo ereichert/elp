@@ -1,7 +1,7 @@
 extern crate walkdir;
 
 use std::path;
-use self::walkdir::WalkDir;
+use self::walkdir::{WalkDir, DirEntry};
 use std::io;
 use std::fs::File;
 use std::io::BufReader;
@@ -11,7 +11,7 @@ pub struct RuntimeContext {
     pub debug: bool,
 }
 
-pub fn file_list(dir: &path::Path, filenames: &mut Vec<walkdir::DirEntry>) -> Result<(), io::Error> {
+pub fn file_list(dir: &path::Path, filenames: &mut Vec<DirEntry>) -> Result<(), io::Error> {
     for entry in WalkDir::new(dir).min_depth(1) {
         let entry = entry.unwrap();
         filenames.push(entry);
