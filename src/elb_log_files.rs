@@ -7,10 +7,6 @@ use std::fs::File;
 use std::io::BufReader;
 use std::io::BufRead;
 
-pub struct RuntimeContext {
-    pub debug: bool,
-}
-
 pub fn file_list(dir: &path::Path, filenames: &mut Vec<DirEntry>) -> Result<(), io::Error> {
     for entry in WalkDir::new(dir).min_depth(1) {
         let entry = entry.unwrap();
@@ -19,7 +15,7 @@ pub fn file_list(dir: &path::Path, filenames: &mut Vec<DirEntry>) -> Result<(), 
     Ok(())
 }
 
-pub fn handle_files(runtime_context: &RuntimeContext, filenames: Vec<walkdir::DirEntry>) -> usize {
+pub fn handle_files(runtime_context: &::RuntimeContext, filenames: Vec<walkdir::DirEntry>) -> usize {
     let debug = runtime_context.debug;
     let mut record_count = 0;
     for filename in filenames {

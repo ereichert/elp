@@ -7,13 +7,14 @@ extern crate walkdir;
 use docopt::Docopt;
 use std::path;
 use aws_abacus::elb_log_files;
+use aws_abacus::RuntimeContext;
 
 fn main() {
     let args: Args = Docopt::new(USAGE)
                             .and_then(|d| d.decode())
                             .unwrap_or_else(|e| e.exit());
 
-    let runtime_context = elb_log_files::RuntimeContext {
+    let runtime_context = RuntimeContext {
         debug: args.flag_debug,
     };
     let debug = runtime_context.debug;
