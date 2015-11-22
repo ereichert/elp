@@ -32,7 +32,7 @@ pub fn handle_files(runtime_context: &::RuntimeContext, filenames: Vec<walkdir::
                 // }
                 let current_file_count = buffered_file.lines().count();
                 record_count += current_file_count;
-                debug!(debug, "Found {} records.", current_file_count);
+                debug!(debug, "Found {} records in file {}.", current_file_count, filename.path().display());
             },
             Err(e) => {
                 println!("ERROR: {}", e);
