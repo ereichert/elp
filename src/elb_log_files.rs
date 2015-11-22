@@ -16,7 +16,7 @@ pub fn file_list(dir: &path::Path, filenames: &mut Vec<DirEntry>) -> Result<usiz
     Ok(filenames.len())
 }
 
-pub fn handle_files(runtime_context: &::RuntimeContext, filenames: Vec<walkdir::DirEntry>) -> usize {
+pub fn process_files(runtime_context: &::RuntimeContext, filenames: Vec<walkdir::DirEntry>) -> usize {
     let debug = runtime_context.debug;
     let mut record_count = 0;
     for filename in filenames {

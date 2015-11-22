@@ -25,7 +25,7 @@ fn main() {
     match elb_log_files::file_list(log_location, &mut filenames) {
         Ok(num_files) => {
             debug!(debug, "Found {} files.", num_files);
-            elb_log_files::handle_files(&runtime_context, filenames);
+            elb_log_files::process_files(&runtime_context, filenames);
         },
         Err(e) => {
             println!("ERROR: {}", e);
