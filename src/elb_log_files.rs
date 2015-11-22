@@ -1,18 +1,19 @@
 extern crate walkdir;
 
 use std::path;
-use self::walkdir::{WalkDir, DirEntry};
-use std::io;
+use self::walkdir::{WalkDir, DirEntry, Error};
 use std::fs::File;
 use std::io::BufReader;
 use std::io::BufRead;
 
-pub fn file_list(dir: &path::Path, filenames: &mut Vec<DirEntry>) -> Result<(), io::Error> {
+pub fn file_list(dir: &path::Path, filenames: &mut Vec<DirEntry>) -> Result<usize, Error> {
     for entry in WalkDir::new(dir).min_depth(1) {
-        let entry = entry.unwrap();
-        filenames.push(entry);
+        match entry {
+            Err(err) => return Err(err),
+            Ok(entry) => filenames.push(entry),
+        }
     }
-    Ok(())
+    Ok(filenames.len())
 }
 
 pub fn handle_files(runtime_context: &::RuntimeContext, filenames: Vec<walkdir::DirEntry>) -> usize {
@@ -34,7 +35,7 @@ pub fn handle_files(runtime_context: &::RuntimeContext, filenames: Vec<walkdir::
                 debug!(debug, "Found {} records.", current_file_count);
             },
             Err(e) => {
-                println!("{}", e);
+                println!("ERROR: {}", e);
             }
         }
     }

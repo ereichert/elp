@@ -23,12 +23,13 @@ fn main() {
 
     let mut filenames = Vec::new();
     match elb_log_files::file_list(log_location, &mut filenames) {
-        Ok(_) => {
-            debug!(debug, "Found {} files.", filenames.len());
-            let record_count = elb_log_files::handle_files(&runtime_context, filenames);
-            debug!(debug, "Found {} records.", record_count);
+        Ok(num_files) => {
+            debug!(debug, "Found {} files.", num_files);
+            elb_log_files::handle_files(&runtime_context, filenames);
         },
-        Err(e) => println!("An error occurred."),
+        Err(e) => {
+            println!("ERROR: {}", e);
+        },
     };
 }
 
