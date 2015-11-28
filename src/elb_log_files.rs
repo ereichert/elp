@@ -2,11 +2,13 @@ extern crate walkdir;
 extern crate chrono;
 
 use std::path;
-use self::walkdir::{WalkDir, DirEntry, Error};
+use self::walkdir::{WalkDir, DirEntry, Error as WalkDirError};
 use std::fs::File;
 use std::io::BufReader;
 use std::io::BufRead;
 use self::chrono::{DateTime, UTC};
+use std::collections::HashMap;
+use std::error::Error;
 
 struct ELBLogEntry {
     time_stamp: DateTime<UTC>,
@@ -25,7 +27,7 @@ struct ELBLogEntry {
     request_http_version: String
 }
 
-pub fn file_list(dir: &path::Path, filenames: &mut Vec<DirEntry>) -> Result<usize, Error> {
+pub fn file_list(dir: &path::Path, filenames: &mut Vec<DirEntry>) -> Result<usize, WalkDirError> {
     for entry in WalkDir::new(dir).min_depth(1) {
         match entry {
             Err(err) => return Err(err),
@@ -63,29 +65,41 @@ pub fn process_files(runtime_context: &::RuntimeContext, filenames: Vec<walkdir:
 #[derive(Debug)]
 struct ParsingErrors;
 
-fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, ParsingErrors> {
+fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, HashMap<String, String>> {
     let split_line: Vec<_> = line.split(" ").collect();
+    let mut errors = HashMap::new();
 
-    let ts = split_line[0].parse().unwrap();
+    let ts = match split_line[0].parse() {
+        Ok(parsed_ts) => Some(parsed_ts),
 
-    let elb_log_entry = ELBLogEntry {
-        time_stamp: ts, //TODO This needs to be error checked once I figure out how to handle errors.
-        elb_name: split_line[1].to_string(),
-        client_address: split_line[2].to_string(),
-        backend_address: split_line[3].to_string(),
-        request_processing_time: split_line[4].parse::<f32>().unwrap(),  //TODO This needs to be error checked once I figure out how to handle errors.
-        backend_processing_time: split_line[5].to_string(),
-        response_processing_time: split_line[6].to_string(),
-        elb_status_code: split_line[7].to_string(),
-        backend_status_code: split_line[8].to_string(),
-        received_bytes: split_line[9].to_string(),
-        sent_bytes: split_line[10].to_string(),
-        request_method: split_line[11].trim_matches('"').to_string(),
-        request_url: split_line[12].to_string(),
-        request_http_version: split_line[13].trim_matches('"').to_string()
+        Err(e) => {
+            errors.insert("timestamp".to_string(), "timestamp_error".to_string());
+            None
+        }
     };
 
-    Ok(Box::new(elb_log_entry))
+    if errors.is_empty() {
+        let elb_log_entry = ELBLogEntry {
+            time_stamp: ts.unwrap(),
+            elb_name: split_line[1].to_string(),
+            client_address: split_line[2].to_string(),
+            backend_address: split_line[3].to_string(),
+            request_processing_time: split_line[4].parse::<f32>().unwrap(),  //TODO This needs to be error checked once I figure out how to handle errors.
+            backend_processing_time: split_line[5].to_string(),
+            response_processing_time: split_line[6].to_string(),
+            elb_status_code: split_line[7].to_string(),
+            backend_status_code: split_line[8].to_string(),
+            received_bytes: split_line[9].to_string(),
+            sent_bytes: split_line[10].to_string(),
+            request_method: split_line[11].trim_matches('"').to_string(),
+            request_url: split_line[12].to_string(),
+            request_http_version: split_line[13].trim_matches('"').to_string()
+        };
+
+        Ok(Box::new(elb_log_entry))
+    } else {
+        Err(errors)
+    }
 }
 
 #[cfg(test)]
