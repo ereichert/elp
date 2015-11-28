@@ -108,7 +108,7 @@ mod tests {
 	fn parse_line_returns_a_log_entry_with_the_request_url() {
         let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
 
-		assert_eq!(elb_log_entry.request_url, "http://some.domain.com:80/path0/path1?param0=p0&param1=p")
+		assert_eq!(elb_log_entry.request_url, "http://some.domain.com:80/path0/path1?param0=p0&param1=p1")
 	}
 
     #[test]
