@@ -7,8 +7,10 @@ use std::fs::File;
 use std::io::BufReader;
 use std::io::BufRead;
 use self::chrono::{DateTime, UTC};
+use self::chrono::format::ParseError;
 use std::collections::HashMap;
 use std::error::Error;
+use std::fmt::{Display, Formatter, Result as fmtResult};
 
 struct ELBLogEntry {
     timestamp: DateTime<UTC>,
@@ -65,6 +67,28 @@ pub fn process_files(runtime_context: &::RuntimeContext, filenames: Vec<walkdir:
 #[derive(Debug)]
 struct ParsingError{
     property: &'static str,
+    inner_description: String
+}
+
+impl Display for ParsingError {
+    fn fmt(&self, f: &mut Formatter) -> fmtResult {
+        write!(
+            f,
+            "Failed to parse {}. The failure messae is {}",
+            self.property,
+            self.inner_description
+        )
+    }
+}
+
+impl Error for ParsingError {
+    fn description(&self) -> &str {
+        &self.inner_description
+    }
+
+    fn cause(&self) -> Option<&Error> {
+        None
+    }
 }
 
 const TIMESTAMP: &'static str = "timestamp";
@@ -79,7 +103,8 @@ fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Vec<ParsingError>> {
         Err(e) => {
             errors.push(
                 ParsingError {
-                    property: TIMESTAMP
+                    property: TIMESTAMP,
+                    inner_description: (e as ParseError).description().to_string(),
                 }
             );
             None
