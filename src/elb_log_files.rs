@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::error::Error;
 
 struct ELBLogEntry {
-    time_stamp: DateTime<UTC>,
+    timestamp: DateTime<UTC>,
     elb_name: String,
     client_address: String,
     backend_address: String,
@@ -63,24 +63,32 @@ pub fn process_files(runtime_context: &::RuntimeContext, filenames: Vec<walkdir:
 }
 
 #[derive(Debug)]
-struct ParsingErrors;
+struct ParsingError{
+    property: &'static str,
+}
 
-fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, HashMap<String, String>> {
+const TIMESTAMP: &'static str = "timestamp";
+
+fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Vec<ParsingError>> {
     let split_line: Vec<_> = line.split(" ").collect();
-    let mut errors = HashMap::new();
+    let mut errors = Vec::new();
 
     let ts = match split_line[0].parse() {
         Ok(parsed_ts) => Some(parsed_ts),
 
         Err(e) => {
-            errors.insert("timestamp".to_string(), "timestamp_error".to_string());
+            errors.push(
+                ParsingError {
+                    property: TIMESTAMP
+                }
+            );
             None
         }
     };
 
     if errors.is_empty() {
         let elb_log_entry = ELBLogEntry {
-            time_stamp: ts.unwrap(),
+            timestamp: ts.unwrap(),
             elb_name: split_line[1].to_string(),
             client_address: split_line[2].to_string(),
             backend_address: split_line[3].to_string(),
@@ -196,10 +204,10 @@ mod tests {
 	}
 
     #[test]
-	fn parse_line_returns_a_log_entry_with_the_time_stamp() {
+	fn parse_line_returns_a_log_entry_with_the_timestamp() {
         let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
 
-		assert_eq!(format!("{:?}", elb_log_entry.time_stamp), "2015-08-15T23:43:05.302180Z")
+		assert_eq!(format!("{:?}", elb_log_entry.timestamp), "2015-08-15T23:43:05.302180Z")
 	}
 
     #[test]
