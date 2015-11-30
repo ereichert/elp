@@ -104,7 +104,7 @@ fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Vec<ParsingError>> {
             errors.push(
                 ParsingError {
                     property: TIMESTAMP,
-                    inner_description: (e as ParseError).description().to_string(),
+                    inner_description: (e as ParseError).description().to_string(),  //TODO try to copy the error to the struct
                 }
             );
             None
