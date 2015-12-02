@@ -23,7 +23,7 @@ fn main() {
     let log_location = &path::Path::new(&args.arg_log_location);
     debug!(debug, "Running summary on {}.", log_location.to_str().unwrap());
 
-    let start = UTC::now();
+    let start = UTC::now(); //TODO put this behind a cli arg
     let mut filenames = Vec::new();
     match elb_log_files::file_list(log_location, &mut filenames) {
         Ok(num_files) => {
@@ -36,11 +36,11 @@ fn main() {
         },
     };
 
-    let end = UTC::now();
+    let end = UTC::now(); //TODO put this behind a cli arg
 
-    let time = end - start;
+    let time = end - start; //TODO put this behind a cli arg
 
-    println!("TIME: {}", time);
+    println!("TIME: {}", time);  //TODO put this behind a cli arg
 }
 
 const USAGE: &'static str = "
