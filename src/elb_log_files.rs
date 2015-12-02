@@ -8,7 +8,6 @@ use std::io::BufReader;
 use std::io::BufRead;
 use self::chrono::{DateTime, UTC};
 use self::chrono::format::ParseError;
-use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result as fmtResult};
 
@@ -111,25 +110,28 @@ fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Vec<ParsingError>> {
         }
     };
 
+    //TODO Write a benchmark test to determine if return a boxed log entry (Ok(Box(entry))) is faster than returning a raw log entry (Ok(entry))
     if errors.is_empty() {
-        let elb_log_entry = ELBLogEntry {
-            timestamp: ts.unwrap(),
-            elb_name: split_line[1].to_string(),
-            client_address: split_line[2].to_string(),
-            backend_address: split_line[3].to_string(),
-            request_processing_time: split_line[4].parse::<f32>().unwrap(),  //TODO This needs to be error checked once I figure out how to handle errors.
-            backend_processing_time: split_line[5].to_string(),
-            response_processing_time: split_line[6].to_string(),
-            elb_status_code: split_line[7].to_string(),
-            backend_status_code: split_line[8].to_string(),
-            received_bytes: split_line[9].to_string(),
-            sent_bytes: split_line[10].to_string(),
-            request_method: split_line[11].trim_matches('"').to_string(),
-            request_url: split_line[12].to_string(),
-            request_http_version: split_line[13].trim_matches('"').to_string()
-        };
-
-        Ok(Box::new(elb_log_entry))
+        Ok(
+            Box::new(
+                ELBLogEntry {
+                    timestamp: ts.unwrap(),
+                    elb_name: split_line[1].to_string(),
+                    client_address: split_line[2].to_string(),
+                    backend_address: split_line[3].to_string(),
+                    request_processing_time: split_line[4].parse::<f32>().unwrap(),  //TODO This needs to be error checked once I figure out how to handle errors.
+                    backend_processing_time: split_line[5].to_string(),
+                    response_processing_time: split_line[6].to_string(),
+                    elb_status_code: split_line[7].to_string(),
+                    backend_status_code: split_line[8].to_string(),
+                    received_bytes: split_line[9].to_string(),
+                    sent_bytes: split_line[10].to_string(),
+                    request_method: split_line[11].trim_matches('"').to_string(),
+                    request_url: split_line[12].to_string(),
+                    request_http_version: split_line[13].trim_matches('"').to_string()
+                }
+            )
+        )
     } else {
         Err(errors)
     }
@@ -138,6 +140,7 @@ fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Vec<ParsingError>> {
 #[cfg(test)]
 mod tests {
     use super::parse_line;
+    use test::Bencher;
 
     const TEST_LINE: &'static str = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
     172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 7582 \
@@ -241,4 +244,9 @@ mod tests {
 
 		assert_eq!(elb_log_entry.elb_name, "elb-name")
 	}
+
+    #[bench]
+    fn bench_parse_line(b: &mut Bencher) {
+        b.iter(|| parse_line(&TEST_LINE.to_string()).unwrap());
+    }
 }
