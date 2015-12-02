@@ -11,7 +11,7 @@ use self::chrono::format::ParseError;
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result as fmtResult};
 
-struct ELBLogEntry {
+pub struct ELBLogEntry {
     timestamp: DateTime<UTC>,
     elb_name: String,
     client_address: String,
@@ -64,7 +64,7 @@ pub fn process_files(runtime_context: &::RuntimeContext, filenames: Vec<walkdir:
 }
 
 #[derive(Debug)]
-struct ParsingError{
+pub struct ParsingError{
     property: &'static str,
     inner_description: String
 }
@@ -92,7 +92,7 @@ impl Error for ParsingError {
 
 const TIMESTAMP: &'static str = "timestamp";
 
-fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Vec<ParsingError>> {
+pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Vec<ParsingError>> {
     let split_line: Vec<_> = line.split(" ").collect();
     let mut errors = Vec::new();
 
@@ -110,7 +110,6 @@ fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Vec<ParsingError>> {
         }
     };
 
-    //TODO Write a benchmark test to determine if return a boxed log entry (Ok(Box(entry))) is faster than returning a raw log entry (Ok(entry))
     if errors.is_empty() {
         Ok(
             Box::new(
@@ -140,7 +139,6 @@ fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Vec<ParsingError>> {
 #[cfg(test)]
 mod tests {
     use super::parse_line;
-    use test::Bencher;
 
     const TEST_LINE: &'static str = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
     172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 7582 \
@@ -244,9 +242,4 @@ mod tests {
 
 		assert_eq!(elb_log_entry.elb_name, "elb-name")
 	}
-
-    #[bench]
-    fn bench_parse_line(b: &mut Bencher) {
-        b.iter(|| parse_line(&TEST_LINE.to_string()).unwrap());
-    }
 }
