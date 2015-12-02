@@ -3,11 +3,13 @@ extern crate docopt;
 #[macro_use]
 extern crate aws_abacus;
 extern crate walkdir;
+extern crate chrono;
 
 use docopt::Docopt;
 use std::path;
 use aws_abacus::elb_log_files;
 use aws_abacus::RuntimeContext;
+use chrono::{UTC};
 
 fn main() {
     let args: Args = Docopt::new(USAGE)
@@ -21,6 +23,7 @@ fn main() {
     let log_location = &path::Path::new(&args.arg_log_location);
     debug!(debug, "Running summary on {}.", log_location.to_str().unwrap());
 
+    let start = UTC::now();
     let mut filenames = Vec::new();
     match elb_log_files::file_list(log_location, &mut filenames) {
         Ok(num_files) => {
@@ -32,6 +35,12 @@ fn main() {
             println!("ERROR: {}", e);
         },
     };
+
+    let end = UTC::now();
+
+    let time = end - start;
+
+    println!("TIME: {}", time);
 }
 
 const USAGE: &'static str = "
