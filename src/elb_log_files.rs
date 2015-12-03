@@ -90,14 +90,14 @@ impl Error for ParsingError {
     }
 }
 
-struct ParsingErrors {
+pub struct ParsingErrors {
     record: String,
     errors: Vec<ParsingError>,
 }
 
 const TIMESTAMP: &'static str = "timestamp";
 
-pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Vec<ParsingError>> {
+pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Box<ParsingErrors>> {
     let split_line: Vec<_> = line.split(" ").collect();
     let mut errors = Vec::new();
 
@@ -117,28 +117,31 @@ pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Vec<ParsingError>> 
     };
 
     if errors.is_empty() {
-        Ok(
-            Box::new(
-                ELBLogEntry {
-                    timestamp: ts.unwrap(),
-                    elb_name: split_line[1].to_string(),
-                    client_address: split_line[2].to_string(),
-                    backend_address: split_line[3].to_string(),
-                    request_processing_time: split_line[4].parse::<f32>().unwrap(),  //TODO This needs to be error checked once I figure out how to handle errors.
-                    backend_processing_time: split_line[5].to_string(),
-                    response_processing_time: split_line[6].to_string(),
-                    elb_status_code: split_line[7].to_string(),
-                    backend_status_code: split_line[8].to_string(),
-                    received_bytes: split_line[9].to_string(),
-                    sent_bytes: split_line[10].to_string(),
-                    request_method: split_line[11].trim_matches('"').to_string(),
-                    request_url: split_line[12].to_string(),
-                    request_http_version: split_line[13].trim_matches('"').to_string()
-                }
-            )
-        )
+        Ok(Box::new(
+            ELBLogEntry {
+                timestamp: ts.unwrap(),
+                elb_name: split_line[1].to_string(),
+                client_address: split_line[2].to_string(),
+                backend_address: split_line[3].to_string(),
+                request_processing_time: split_line[4].parse::<f32>().unwrap(),  //TODO This needs to be error checked once I figure out how to handle errors.
+                backend_processing_time: split_line[5].to_string(),
+                response_processing_time: split_line[6].to_string(),
+                elb_status_code: split_line[7].to_string(),
+                backend_status_code: split_line[8].to_string(),
+                received_bytes: split_line[9].to_string(),
+                sent_bytes: split_line[10].to_string(),
+                request_method: split_line[11].trim_matches('"').to_string(),
+                request_url: split_line[12].to_string(),
+                request_http_version: split_line[13].trim_matches('"').to_string()
+            }
+        ))
     } else {
-        Err(errors)
+        Err(Box::new(
+            ParsingErrors {
+                record: line.clone(),
+                errors: errors
+            }
+        ))
     }
 }
 
