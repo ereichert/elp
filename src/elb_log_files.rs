@@ -90,6 +90,7 @@ impl Error for ParsingError {
     }
 }
 
+#[derive(Debug)]
 pub struct ParsingErrors {
     record: String,
     errors: Vec<ParsingError>,
