@@ -9,7 +9,9 @@ use docopt::Docopt;
 use std::path;
 use aws_abacus::elb_log_files;
 use aws_abacus::RuntimeContext;
-use chrono::{UTC};
+use chrono::{DateTime, UTC};
+
+// chrono::datetime::DateTime<chrono::offset::utc::UTC>
 
 fn main() {
     let args: Args = Docopt::new(USAGE)
@@ -23,24 +25,39 @@ fn main() {
     let log_location = &path::Path::new(&args.arg_log_location);
     debug!(debug, "Running summary on {}.", log_location.to_str().unwrap());
 
-    let start = UTC::now(); //TODO put this behind a cli arg
+    let start: Option<DateTime<UTC>> = if args.flag_benchmark {
+        Some(UTC::now())
+    } else {
+        None
+    };
+
+    let mut number_of_files = 0;
+    let mut number_of_records = 0;
     let mut filenames = Vec::new();
     match elb_log_files::file_list(log_location, &mut filenames) {
         Ok(num_files) => {
-            debug!(debug, "Found {} files.", num_files);
-            let total_record_count = elb_log_files::process_files(&runtime_context, filenames);
-            debug!(debug, "Processed {} records in {} files.", total_record_count, num_files);
+            number_of_files = num_files;
+            debug!(debug, "Found {} files.", number_of_files);
+            number_of_records = elb_log_files::process_files(&runtime_context, filenames);
+            debug!(debug, "Processed {} records in {} files.", number_of_records, num_files);
         },
         Err(e) => {
             println!("ERROR: {}", e);
         },
     };
 
-    let end = UTC::now(); //TODO put this behind a cli arg
-
-    let time = end - start; //TODO put this behind a cli arg
-
-    println!("TIME: {}", time);  //TODO put this behind a cli arg
+    match start {
+        Some(s) => {
+            let end = UTC::now();
+            let time = end - s;
+            println!("Processed {} files having {} records in {} milliseconds.",
+                number_of_files,
+                number_of_records,
+                time.num_milliseconds()
+            );
+        },
+        None => {},
+    };
 }
 
 const USAGE: &'static str = "
@@ -48,7 +65,7 @@ aws-abacus
 
 Usage:
   aws-abacus <log-location>
-  aws-abacus (-d | --debug) <log-location>
+  aws-abacus (-d | --debug | -b | --benchmark) <log-location>
   aws-abacus (-h | --help)
 
 Options:
@@ -60,4 +77,5 @@ Options:
 struct Args {
     arg_log_location: String,
     flag_debug: bool,
+    flag_benchmark: bool,
 }
