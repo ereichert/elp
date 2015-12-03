@@ -66,7 +66,7 @@ pub fn process_files(runtime_context: &::RuntimeContext, filenames: Vec<walkdir:
 #[derive(Debug)]
 pub struct ParsingError{
     property: &'static str,
-    inner_description: String
+    inner_description: String,
 }
 
 impl Display for ParsingError {
@@ -103,7 +103,8 @@ pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Vec<ParsingError>> 
             errors.push(
                 ParsingError {
                     property: TIMESTAMP,
-                    inner_description: (e as ParseError).description().to_string(),  //TODO try to copy the error to the struct
+                    //TODO Figure out a way to pass ownership of the original error to the ParsingError to make it available to callers.
+                    inner_description: (e as ParseError).description().to_string(),
                 }
             );
             None
