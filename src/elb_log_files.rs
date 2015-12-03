@@ -90,6 +90,11 @@ impl Error for ParsingError {
     }
 }
 
+struct ParsingErrors {
+    record: String,
+    errors: Vec<ParsingError>,
+}
+
 const TIMESTAMP: &'static str = "timestamp";
 
 pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Vec<ParsingError>> {
