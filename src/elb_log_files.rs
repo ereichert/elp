@@ -9,6 +9,7 @@ use std::io::BufRead;
 use self::chrono::{DateTime, UTC};
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result as fmtResult};
+use std::str::FromStr;
 
 pub struct ELBLogEntry {
     timestamp: DateTime<UTC>,
@@ -100,37 +101,10 @@ const REQUEST_PROCESSING_TIME: &'static str = "request processing time";
 
 pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Box<ParsingErrors>> {
     let split_line: Vec<_> = line.split(" ").collect();
-    let mut errors = Vec::new();
+    let mut errors: Vec<ParsingError> = Vec::new();
 
-    let ts = match split_line[0].parse::<DateTime<UTC>>() {
-        Ok(parsed_ts) => Some(parsed_ts),
-
-        Err(e) => {
-            errors.push(
-                ParsingError {
-                    property: TIMESTAMP,
-                    //TODO Figure out a way to pass ownership of the original error to the ParsingError to make it available to callers.
-                    inner_description: e.description().to_string(),
-                }
-            );
-            None
-        }
-    };
-
-    let req_proc_time = match split_line[4].parse::<f32>() {
-        Ok(parsed_rpt) => Some(parsed_rpt),
-
-        Err(e) => {
-            errors.push(
-                ParsingError {
-                    property: REQUEST_PROCESSING_TIME,
-                    //TODO Figure out a way to pass ownership of the original error to the ParsingError to make it available to callers.
-                    inner_description: e.description().to_string(),
-                }
-            );
-            None
-        }
-    };
+    let ts = parse_property::<DateTime<UTC>>(split_line[0], &mut errors);
+    let req_proc_time = parse_property::<f32>(split_line[4], &mut errors);
 
     if errors.is_empty() {
         Ok(Box::new(
@@ -158,6 +132,23 @@ pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Box<ParsingErrors>>
                 errors: errors
             }
         ))
+    }
+}
+
+fn parse_property<T: FromStr>(raw_prop: &str, errors: &mut Vec<ParsingError>) -> Option<T> {
+    match raw_prop.parse::<T>() {
+        Ok(parsed) => Some(parsed),
+
+        Err(e) => {
+            errors.push(
+                ParsingError {
+                    property: TIMESTAMP,
+                    //TODO Figure out a way to pass ownership of the original error to the ParsingError to make it available to callers.
+                    inner_description: "(e as Error).to_string()".to_string(),
+                }
+            );
+            None
+        }
     }
 }
 
