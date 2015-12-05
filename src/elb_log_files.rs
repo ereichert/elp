@@ -103,8 +103,8 @@ pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Box<ParsingErrors>>
     let split_line: Vec<_> = line.split(" ").collect();
     let mut errors: Vec<ParsingError> = Vec::new();
 
-    let ts = parse_property::<DateTime<UTC>>(split_line[0], &mut errors);
-    let req_proc_time = parse_property::<f32>(split_line[4], &mut errors);
+    let ts = parse_property::<DateTime<UTC>>(split_line[0], TIMESTAMP, &mut errors);
+    let req_proc_time = parse_property::<f32>(split_line[4], REQUEST_PROCESSING_TIME, &mut errors);
 
     if errors.is_empty() {
         Ok(Box::new(
@@ -135,14 +135,14 @@ pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Box<ParsingErrors>>
     }
 }
 
-fn parse_property<T: FromStr>(raw_prop: &str, errors: &mut Vec<ParsingError>) -> Option<T> {
+fn parse_property<T: FromStr>(raw_prop: &str, prop_name: &'static str, errors: &mut Vec<ParsingError>) -> Option<T> {
     match raw_prop.parse::<T>() {
         Ok(parsed) => Some(parsed),
 
         Err(e) => {
             errors.push(
                 ParsingError {
-                    property: TIMESTAMP,
+                    property: prop_name,
                     //TODO Figure out a way to pass ownership of the original error to the ParsingError to make it available to callers.
                     inner_description: "(e as Error).to_string()".to_string(),
                 }
