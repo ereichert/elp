@@ -7,7 +7,6 @@ use std::fs::File;
 use std::io::BufReader;
 use std::io::BufRead;
 use self::chrono::{DateTime, UTC};
-use self::chrono::format::ParseError;
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result as fmtResult};
 
@@ -97,12 +96,13 @@ pub struct ParsingErrors {
 }
 
 const TIMESTAMP: &'static str = "timestamp";
+const REQUEST_PROCESSING_TIME: &'static str = "request processing time";
 
 pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Box<ParsingErrors>> {
     let split_line: Vec<_> = line.split(" ").collect();
     let mut errors = Vec::new();
 
-    let ts = match split_line[0].parse() {
+    let ts = match split_line[0].parse::<DateTime<UTC>>() {
         Ok(parsed_ts) => Some(parsed_ts),
 
         Err(e) => {
@@ -110,7 +110,22 @@ pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Box<ParsingErrors>>
                 ParsingError {
                     property: TIMESTAMP,
                     //TODO Figure out a way to pass ownership of the original error to the ParsingError to make it available to callers.
-                    inner_description: (e as ParseError).description().to_string(),
+                    inner_description: e.description().to_string(),
+                }
+            );
+            None
+        }
+    };
+
+    let req_proc_time = match split_line[4].parse::<f32>() {
+        Ok(parsed_rpt) => Some(parsed_rpt),
+
+        Err(e) => {
+            errors.push(
+                ParsingError {
+                    property: REQUEST_PROCESSING_TIME,
+                    //TODO Figure out a way to pass ownership of the original error to the ParsingError to make it available to callers.
+                    inner_description: e.description().to_string(),
                 }
             );
             None
@@ -124,7 +139,7 @@ pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Box<ParsingErrors>>
                 elb_name: split_line[1].to_string(),
                 client_address: split_line[2].to_string(),
                 backend_address: split_line[3].to_string(),
-                request_processing_time: split_line[4].parse::<f32>().unwrap(),  //TODO This needs to be error checked once I figure out how to handle errors.
+                request_processing_time: req_proc_time.unwrap(),
                 backend_processing_time: split_line[5].to_string(),
                 response_processing_time: split_line[6].to_string(),
                 elb_status_code: split_line[7].to_string(),
