@@ -8,7 +8,6 @@ use std::io::BufReader;
 use std::io::BufRead;
 use self::chrono::{DateTime, UTC};
 use std::error::Error;
-use std::fmt::{Display, Formatter, Result as fmtResult};
 use std::str::FromStr;
 
 pub struct ELBLogEntry {
@@ -66,28 +65,7 @@ pub fn process_files(runtime_context: &::RuntimeContext, filenames: Vec<walkdir:
 #[derive(Debug)]
 pub struct ParsingError{
     property: &'static str,
-    inner_description: String,
-}
-
-impl Display for ParsingError {
-    fn fmt(&self, f: &mut Formatter) -> fmtResult {
-        write!(
-            f,
-            "Failed to parse {}. The failure messae is {}",
-            self.property,
-            self.inner_description
-        )
-    }
-}
-
-impl Error for ParsingError {
-    fn description(&self) -> &str {
-        &self.inner_description
-    }
-
-    fn cause(&self) -> Option<&Error> {
-        None
-    }
+    inner_description: Box<Error>,
 }
 
 #[derive(Debug)]
@@ -135,7 +113,10 @@ pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Box<ParsingErrors>>
     }
 }
 
-fn parse_property<T: FromStr>(raw_prop: &str, prop_name: &'static str, errors: &mut Vec<ParsingError>) -> Option<T> {
+fn parse_property<T>(raw_prop: &str, prop_name: &'static str, errors: &mut Vec<ParsingError>) -> Option<T>
+    where T: FromStr,
+    T::Err: 'static + Error,
+{
     match raw_prop.parse::<T>() {
         Ok(parsed) => Some(parsed),
 
@@ -143,8 +124,7 @@ fn parse_property<T: FromStr>(raw_prop: &str, prop_name: &'static str, errors: &
             errors.push(
                 ParsingError {
                     property: prop_name,
-                    //TODO Figure out a way to pass ownership of the original error to the ParsingError to make it available to callers.
-                    inner_description: "(e as Error).to_string()".to_string(),
+                    inner_description: Box::new(e),
                 }
             );
             None
