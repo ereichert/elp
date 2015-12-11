@@ -115,7 +115,7 @@ pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Box<ParsingErrors>>
 
 fn parse_property<T>(raw_prop: &str, prop_name: &'static str, errors: &mut Vec<ParsingError>) -> Option<T>
     where T: FromStr,
-    T::Err: 'static + Error,
+    T::Err: Error + 'static,
 {
     match raw_prop.parse::<T>() {
         Ok(parsed) => Some(parsed),
