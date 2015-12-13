@@ -9,12 +9,13 @@ use std::io::BufRead;
 use self::chrono::{DateTime, UTC};
 use std::error::Error;
 use std::str::FromStr;
+use std::net::SocketAddrV4;
 
 pub struct ELBLogEntry {
     timestamp: DateTime<UTC>,
     elb_name: String,
-    client_address: String,
-    backend_address: String,
+    client_address: SocketAddrV4,
+    backend_address: SocketAddrV4,
     request_processing_time: f32,
     backend_processing_time: f32,
     response_processing_time: f32,
@@ -75,6 +76,8 @@ pub struct ParsingErrors {
 }
 
 const TIMESTAMP: &'static str = "timestamp";
+const CLIENT_ADDRESS: &'static str = "client address";
+const BACKEND_ADDRESS: &'static str = "backend address";
 const REQUEST_PROCESSING_TIME: &'static str = "request processing time";
 const BACKEND_PROCESSING_TIME: &'static str = "backend processing time";
 const RESPONSE_PROCESSING_TIME: &'static str = "response processing time";
@@ -88,6 +91,8 @@ pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Box<ParsingErrors>>
     let mut errors: Vec<ParsingError> = Vec::new();
 
     let ts = parse_property::<DateTime<UTC>>(split_line[0], TIMESTAMP, &mut errors);
+    let clnt_addr = parse_property::<SocketAddrV4>(split_line[2], CLIENT_ADDRESS, &mut errors);
+    let be_addr = parse_property::<SocketAddrV4>(split_line[3], BACKEND_ADDRESS, &mut errors);
     let req_proc_time = parse_property::<f32>(split_line[4], REQUEST_PROCESSING_TIME, &mut errors);
     let be_proc_time = parse_property::<f32>(split_line[5], BACKEND_PROCESSING_TIME, &mut errors);
     let res_proc_time = parse_property::<f32>(split_line[6], RESPONSE_PROCESSING_TIME, &mut errors);
@@ -101,8 +106,8 @@ pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Box<ParsingErrors>>
             ELBLogEntry {
                 timestamp: ts.unwrap(),
                 elb_name: split_line[1].to_string(),
-                client_address: split_line[2].to_string(),
-                backend_address: split_line[3].to_string(),
+                client_address: clnt_addr.unwrap(),
+                backend_address: be_addr.unwrap(),
                 request_processing_time: req_proc_time.unwrap(),
                 backend_processing_time: be_proc_time.unwrap(),
                 response_processing_time: res_proc_time.unwrap(),
@@ -227,14 +232,14 @@ mod tests {
 	fn parse_line_returns_a_log_entry_with_the_backend_address() {
         let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
 
-		assert_eq!(elb_log_entry.backend_address, "172.16.1.5:9000")
+		assert_eq!(elb_log_entry.backend_address, "172.16.1.5:9000".parse().unwrap())
 	}
 
     #[test]
 	fn parse_line_returns_a_log_entry_with_the_client_address() {
         let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
 
-		assert_eq!(elb_log_entry.client_address, "172.16.1.6:54814")
+		assert_eq!(elb_log_entry.client_address, "172.16.1.6:54814".parse().unwrap())
 	}
 
     #[test]

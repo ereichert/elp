@@ -2,6 +2,13 @@
 
 13/12/2015 -
 
+All of the properties have been migrated to specific types including the
+client and backend addresses.
+
+Processed 121 files having 9340036 records in 33014 milliseconds.
+
+13/12/2015 -
+
 Most of the properties that should be specific types have been converted.
 
 Processed 121 files having 9340036 records in 33877 milliseconds.
