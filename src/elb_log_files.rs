@@ -20,8 +20,8 @@ pub struct ELBLogEntry {
     response_processing_time: f32,
     elb_status_code: u16,
     backend_status_code: u16,
-    received_bytes: String,
-    sent_bytes: String,
+    received_bytes: u64,
+    sent_bytes: u64,
     request_method: String,
     request_url: String,
     request_http_version: String
@@ -80,6 +80,8 @@ const BACKEND_PROCESSING_TIME: &'static str = "backend processing time";
 const RESPONSE_PROCESSING_TIME: &'static str = "response processing time";
 const ELB_STATUS_CODE: &'static str = "ELB status code";
 const BE_STATUS_CODE: &'static str = "backend status code";
+const RECEIVED_BYTES: &'static str = "received bytes";
+const SENT_BYTES: &'static str = "sent bytes";
 
 pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Box<ParsingErrors>> {
     let split_line: Vec<_> = line.split(" ").collect();
@@ -91,6 +93,8 @@ pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Box<ParsingErrors>>
     let res_proc_time = parse_property::<f32>(split_line[6], RESPONSE_PROCESSING_TIME, &mut errors);
     let elb_sc = parse_property::<u16>(split_line[7], ELB_STATUS_CODE, &mut errors);
     let be_sc = parse_property::<u16>(split_line[8], BE_STATUS_CODE, &mut errors);
+    let bytes_received = parse_property::<u64>(split_line[9], RECEIVED_BYTES, &mut errors);
+    let bytes_sent = parse_property::<u64>(split_line[10], SENT_BYTES, &mut errors);
 
     if errors.is_empty() {
         Ok(Box::new(
@@ -104,8 +108,8 @@ pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Box<ParsingErrors>>
                 response_processing_time: res_proc_time.unwrap(),
                 elb_status_code: elb_sc.unwrap(),
                 backend_status_code: be_sc.unwrap(),
-                received_bytes: split_line[9].to_string(),
-                sent_bytes: split_line[10].to_string(),
+                received_bytes: bytes_received.unwrap(),
+                sent_bytes: bytes_sent.unwrap(),
                 request_method: split_line[11].trim_matches('"').to_string(),
                 request_url: split_line[12].to_string(),
                 request_http_version: split_line[13].trim_matches('"').to_string()
@@ -174,14 +178,14 @@ mod tests {
 	fn parse_line_returns_a_log_entry_with_the_sent_bytes() {
         let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
 
-		assert_eq!(elb_log_entry.sent_bytes, "7582")
+		assert_eq!(elb_log_entry.sent_bytes, 7582)
 	}
 
     #[test]
 	fn parse_line_returns_a_log_entry_with_the_received_bytes() {
         let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
 
-		assert_eq!(elb_log_entry.received_bytes, "0")
+		assert_eq!(elb_log_entry.received_bytes, 0)
 	}
 
     #[test]
