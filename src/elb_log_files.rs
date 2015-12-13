@@ -18,8 +18,8 @@ pub struct ELBLogEntry {
     request_processing_time: f32,
     backend_processing_time: f32,
     response_processing_time: f32,
-    elb_status_code: String,
-    backend_status_code: String,
+    elb_status_code: u16,
+    backend_status_code: u16,
     received_bytes: String,
     sent_bytes: String,
     request_method: String,
@@ -78,6 +78,8 @@ const TIMESTAMP: &'static str = "timestamp";
 const REQUEST_PROCESSING_TIME: &'static str = "request processing time";
 const BACKEND_PROCESSING_TIME: &'static str = "backend processing time";
 const RESPONSE_PROCESSING_TIME: &'static str = "response processing time";
+const ELB_STATUS_CODE: &'static str = "ELB status code";
+const BE_STATUS_CODE: &'static str = "backend status code";
 
 pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Box<ParsingErrors>> {
     let split_line: Vec<_> = line.split(" ").collect();
@@ -87,6 +89,8 @@ pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Box<ParsingErrors>>
     let req_proc_time = parse_property::<f32>(split_line[4], REQUEST_PROCESSING_TIME, &mut errors);
     let be_proc_time = parse_property::<f32>(split_line[5], BACKEND_PROCESSING_TIME, &mut errors);
     let res_proc_time = parse_property::<f32>(split_line[6], RESPONSE_PROCESSING_TIME, &mut errors);
+    let elb_sc = parse_property::<u16>(split_line[7], ELB_STATUS_CODE, &mut errors);
+    let be_sc = parse_property::<u16>(split_line[8], BE_STATUS_CODE, &mut errors);
 
     if errors.is_empty() {
         Ok(Box::new(
@@ -98,8 +102,8 @@ pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Box<ParsingErrors>>
                 request_processing_time: req_proc_time.unwrap(),
                 backend_processing_time: be_proc_time.unwrap(),
                 response_processing_time: res_proc_time.unwrap(),
-                elb_status_code: split_line[7].to_string(),
-                backend_status_code: split_line[8].to_string(),
+                elb_status_code: elb_sc.unwrap(),
+                backend_status_code: be_sc.unwrap(),
                 received_bytes: split_line[9].to_string(),
                 sent_bytes: split_line[10].to_string(),
                 request_method: split_line[11].trim_matches('"').to_string(),
@@ -184,14 +188,14 @@ mod tests {
 	fn parse_line_returns_a_log_entry_with_the_backend_status_code() {
         let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
 
-		assert_eq!(elb_log_entry.backend_status_code, "200")
+		assert_eq!(elb_log_entry.backend_status_code, 200)
 	}
 
     #[test]
 	fn parse_line_returns_a_log_entry_with_the_elb_status_code() {
         let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
 
-		assert_eq!(elb_log_entry.elb_status_code, "200")
+		assert_eq!(elb_log_entry.elb_status_code, 200)
 	}
 
     #[test]
