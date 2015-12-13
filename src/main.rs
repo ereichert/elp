@@ -11,8 +11,6 @@ use aws_abacus::elb_log_files;
 use aws_abacus::RuntimeContext;
 use chrono::{DateTime, UTC};
 
-// chrono::datetime::DateTime<chrono::offset::utc::UTC>
-
 fn main() {
     let args: Args = Docopt::new(USAGE)
                             .and_then(|d| d.decode())
