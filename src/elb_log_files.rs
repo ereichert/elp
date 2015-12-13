@@ -38,6 +38,9 @@ pub fn file_list(dir: &path::Path, filenames: &mut Vec<DirEntry>) -> Result<usiz
     Ok(filenames.len())
 }
 
+
+//TODO Reconsider logging based on the standard interfaces included with Rust.
+//TODO We really want to accept a function to handle the parsed lines.
 pub fn process_files(runtime_context: &::RuntimeContext, filenames: Vec<walkdir::DirEntry>) -> usize {
     let debug = runtime_context.debug;
     let mut record_count = 0;
@@ -63,6 +66,7 @@ pub fn process_files(runtime_context: &::RuntimeContext, filenames: Vec<walkdir:
     record_count
 }
 
+//TODO Take a look at the error handling once again.  This doesn't feel write given code you've read.
 #[derive(Debug)]
 pub struct ParsingError{
     property: &'static str,
@@ -90,6 +94,7 @@ pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Box<ParsingErrors>>
     let split_line: Vec<_> = line.split(" ").collect();
     let mut errors: Vec<ParsingError> = Vec::new();
 
+    //TODO consider an enum representing the idices
     let ts = parse_property::<DateTime<UTC>>(split_line[0], TIMESTAMP, &mut errors);
     let clnt_addr = parse_property::<SocketAddrV4>(split_line[2], CLIENT_ADDRESS, &mut errors);
     let be_addr = parse_property::<SocketAddrV4>(split_line[3], BACKEND_ADDRESS, &mut errors);
@@ -148,6 +153,8 @@ fn parse_property<T>(raw_prop: &str, prop_name: &'static str, errors: &mut Vec<P
         }
     }
 }
+
+//TODO test the error case.
 
 #[cfg(test)]
 mod tests {
