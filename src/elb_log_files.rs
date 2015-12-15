@@ -10,7 +10,9 @@ use self::chrono::{DateTime, UTC};
 use std::error::Error;
 use std::str::FromStr;
 use std::net::SocketAddrV4;
+use std::num;
 
+#[derive(Debug)]
 pub struct ELBLogEntry {
     timestamp: DateTime<UTC>,
     elb_name: String,
@@ -67,18 +69,20 @@ pub fn process_files(runtime_context: &::RuntimeContext, filenames: Vec<walkdir:
 }
 
 //TODO Take a look at the error handling once again.  This doesn't feel write given code you've read.
-#[derive(Debug)]
-pub struct ParsingError{
-    property: &'static str,
-    inner_description: Box<Error>,
-}
 
 #[derive(Debug)]
 pub struct ParsingErrors {
     record: String,
-    errors: Vec<ParsingError>,
+    errors: Vec<ELBLogEntryErrors>,
 }
 
+#[derive(Debug, PartialEq)]
+enum ELBLogEntryErrors {
+    MalformedEntry,
+    ParsingError { property: &'static str, description: String },
+}
+
+const ELB_LOG_ENTRY_FIELD_COUNT: usize = 14;
 const TIMESTAMP: &'static str = "timestamp";
 const CLIENT_ADDRESS: &'static str = "client address";
 const BACKEND_ADDRESS: &'static str = "backend address";
@@ -90,52 +94,57 @@ const BE_STATUS_CODE: &'static str = "backend status code";
 const RECEIVED_BYTES: &'static str = "received bytes";
 const SENT_BYTES: &'static str = "sent bytes";
 
-pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, Box<ParsingErrors>> {
+pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, ParsingErrors> {
     let split_line: Vec<_> = line.split(" ").collect();
-    let mut errors: Vec<ParsingError> = Vec::new();
+    let mut errors: Vec<ELBLogEntryErrors> = Vec::new();
+    if split_line.len() == ELB_LOG_ENTRY_FIELD_COUNT {
+        //TODO consider an enum representing the idices
+        let ts = parse_property::<DateTime<UTC>>(split_line[0], TIMESTAMP, &mut errors);
+        let clnt_addr = parse_property::<SocketAddrV4>(split_line[2], CLIENT_ADDRESS, &mut errors);
+        let be_addr = parse_property::<SocketAddrV4>(split_line[3], BACKEND_ADDRESS, &mut errors);
+        let req_proc_time = parse_property::<f32>(split_line[4], REQUEST_PROCESSING_TIME, &mut errors);
+        let be_proc_time = parse_property::<f32>(split_line[5], BACKEND_PROCESSING_TIME, &mut errors);
+        let res_proc_time = parse_property::<f32>(split_line[6], RESPONSE_PROCESSING_TIME, &mut errors);
+        let elb_sc = parse_property::<u16>(split_line[7], ELB_STATUS_CODE, &mut errors);
+        let be_sc = parse_property::<u16>(split_line[8], BE_STATUS_CODE, &mut errors);
+        let bytes_received = parse_property::<u64>(split_line[9], RECEIVED_BYTES, &mut errors);
+        let bytes_sent = parse_property::<u64>(split_line[10], SENT_BYTES, &mut errors);
 
-    //TODO consider an enum representing the idices
-    let ts = parse_property::<DateTime<UTC>>(split_line[0], TIMESTAMP, &mut errors);
-    let clnt_addr = parse_property::<SocketAddrV4>(split_line[2], CLIENT_ADDRESS, &mut errors);
-    let be_addr = parse_property::<SocketAddrV4>(split_line[3], BACKEND_ADDRESS, &mut errors);
-    let req_proc_time = parse_property::<f32>(split_line[4], REQUEST_PROCESSING_TIME, &mut errors);
-    let be_proc_time = parse_property::<f32>(split_line[5], BACKEND_PROCESSING_TIME, &mut errors);
-    let res_proc_time = parse_property::<f32>(split_line[6], RESPONSE_PROCESSING_TIME, &mut errors);
-    let elb_sc = parse_property::<u16>(split_line[7], ELB_STATUS_CODE, &mut errors);
-    let be_sc = parse_property::<u16>(split_line[8], BE_STATUS_CODE, &mut errors);
-    let bytes_received = parse_property::<u64>(split_line[9], RECEIVED_BYTES, &mut errors);
-    let bytes_sent = parse_property::<u64>(split_line[10], SENT_BYTES, &mut errors);
-
-    if errors.is_empty() {
-        Ok(Box::new(
-            ELBLogEntry {
-                timestamp: ts.unwrap(),
-                elb_name: split_line[1].to_string(),
-                client_address: clnt_addr.unwrap(),
-                backend_address: be_addr.unwrap(),
-                request_processing_time: req_proc_time.unwrap(),
-                backend_processing_time: be_proc_time.unwrap(),
-                response_processing_time: res_proc_time.unwrap(),
-                elb_status_code: elb_sc.unwrap(),
-                backend_status_code: be_sc.unwrap(),
-                received_bytes: bytes_received.unwrap(),
-                sent_bytes: bytes_sent.unwrap(),
-                request_method: split_line[11].trim_matches('"').to_string(),
-                request_url: split_line[12].to_string(),
-                request_http_version: split_line[13].trim_matches('"').to_string()
-            }
-        ))
-    } else {
-        Err(Box::new(
-            ParsingErrors {
+        if errors.is_empty() {
+            Ok(Box::new(
+                ELBLogEntry {
+                    timestamp: ts.unwrap(),
+                    elb_name: split_line[1].to_string(),
+                    client_address: clnt_addr.unwrap(),
+                    backend_address: be_addr.unwrap(),
+                    request_processing_time: req_proc_time.unwrap(),
+                    backend_processing_time: be_proc_time.unwrap(),
+                    response_processing_time: res_proc_time.unwrap(),
+                    elb_status_code: elb_sc.unwrap(),
+                    backend_status_code: be_sc.unwrap(),
+                    received_bytes: bytes_received.unwrap(),
+                    sent_bytes: bytes_sent.unwrap(),
+                    request_method: split_line[11].trim_matches('"').to_string(),
+                    request_url: split_line[12].to_string(),
+                    request_http_version: split_line[13].trim_matches('"').to_string()
+                }
+            ))
+        } else {
+            Err(ParsingErrors {
                 record: line.clone(),
                 errors: errors
-            }
-        ))
+            })
+        }
+    } else {
+        errors.push(ELBLogEntryErrors::MalformedEntry);
+        Err(ParsingErrors {
+            record: line.clone(),
+            errors: errors
+        })
     }
 }
 
-fn parse_property<T>(raw_prop: &str, prop_name: &'static str, errors: &mut Vec<ParsingError>) -> Option<T>
+fn parse_property<T>(raw_prop: &str, prop_name: &'static str, errors: &mut Vec<ELBLogEntryErrors>) -> Option<T>
     where T: FromStr,
     T::Err: Error + 'static,
 {
@@ -144,9 +153,9 @@ fn parse_property<T>(raw_prop: &str, prop_name: &'static str, errors: &mut Vec<P
 
         Err(e) => {
             errors.push(
-                ParsingError {
+                ELBLogEntryErrors::ParsingError {
                     property: prop_name,
-                    inner_description: Box::new(e),
+                    description: e.description().to_string(),
                 }
             );
             None
@@ -155,15 +164,29 @@ fn parse_property<T>(raw_prop: &str, prop_name: &'static str, errors: &mut Vec<P
 }
 
 //TODO test the error case.
+//TODO unite the nomenclature under entry (vs record)
 
 #[cfg(test)]
 mod tests {
     use super::parse_line;
+    use super::ELBLogEntryErrors;
 
     const TEST_LINE: &'static str = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
     172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 7582 \
-    \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\" \
+    \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
     ";
+
+    #[test]
+	fn parse_line_returns_a_malformed_record_error_for_records_short_on_values() {
+        let short_record = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
+        172.16.1.5:9000 0.000039 200 200 0 7582 \
+        \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\" \
+        ";
+
+        let malformed_error = parse_line(&short_record.to_string()).unwrap_err().errors.pop();
+
+		assert_eq!(malformed_error, Some(ELBLogEntryErrors::MalformedEntry))
+	}
 
     #[test]
 	fn parse_line_returns_a_log_entry_with_the_request_http_version() {
