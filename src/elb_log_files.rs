@@ -10,10 +10,9 @@ use self::chrono::{DateTime, UTC};
 use std::error::Error;
 use std::str::FromStr;
 use std::net::SocketAddrV4;
-use std::num;
 
 #[derive(Debug)]
-pub struct ELBLogEntry {
+pub struct ELBRecord {
     timestamp: DateTime<UTC>,
     elb_name: String,
     client_address: SocketAddrV4,
@@ -52,8 +51,17 @@ pub fn process_files(runtime_context: &::RuntimeContext, filenames: Vec<walkdir:
             Ok(file) => {
                 let buffered_file = BufReader::new(&file);
                 let recs: Vec<_> = buffered_file.lines()
-                    .map(|x| {
-                        parse_line(&(x.unwrap()))
+                    .map(|possible_line| {
+                        match possible_line {
+                            Ok(record) => parse_record(record),
+
+                            Err(_) => {
+                                Err(ParsingErrors {
+                                    record: "".to_string(),
+                                    errors: vec![ELBRecordParsingErrors::LineReadError]
+                                })
+                            }
+                        }
                     })
                     .collect();
                 record_count += recs.len();
@@ -73,16 +81,17 @@ pub fn process_files(runtime_context: &::RuntimeContext, filenames: Vec<walkdir:
 #[derive(Debug)]
 pub struct ParsingErrors {
     record: String,
-    errors: Vec<ELBLogEntryErrors>,
+    errors: Vec<ELBRecordParsingErrors>,
 }
 
 #[derive(Debug, PartialEq)]
-enum ELBLogEntryErrors {
-    MalformedEntry,
+enum ELBRecordParsingErrors {
+    MalformedRecord,
     ParsingError { property: &'static str, description: String },
+    LineReadError
 }
 
-const ELB_LOG_ENTRY_FIELD_COUNT: usize = 14;
+const ELB_RECORD_FIELD_COUNT: usize = 14;
 const TIMESTAMP: &'static str = "timestamp";
 const CLIENT_ADDRESS: &'static str = "client address";
 const BACKEND_ADDRESS: &'static str = "backend address";
@@ -94,57 +103,67 @@ const BE_STATUS_CODE: &'static str = "backend status code";
 const RECEIVED_BYTES: &'static str = "received bytes";
 const SENT_BYTES: &'static str = "sent bytes";
 
-pub fn parse_line(line: &String) -> Result<Box<ELBLogEntry>, ParsingErrors> {
-    let split_line: Vec<_> = line.split(" ").collect();
-    let mut errors: Vec<ELBLogEntryErrors> = Vec::new();
-    if split_line.len() == ELB_LOG_ENTRY_FIELD_COUNT {
-        //TODO consider an enum representing the idices
-        let ts = parse_property::<DateTime<UTC>>(split_line[0], TIMESTAMP, &mut errors);
-        let clnt_addr = parse_property::<SocketAddrV4>(split_line[2], CLIENT_ADDRESS, &mut errors);
-        let be_addr = parse_property::<SocketAddrV4>(split_line[3], BACKEND_ADDRESS, &mut errors);
-        let req_proc_time = parse_property::<f32>(split_line[4], REQUEST_PROCESSING_TIME, &mut errors);
-        let be_proc_time = parse_property::<f32>(split_line[5], BACKEND_PROCESSING_TIME, &mut errors);
-        let res_proc_time = parse_property::<f32>(split_line[6], RESPONSE_PROCESSING_TIME, &mut errors);
-        let elb_sc = parse_property::<u16>(split_line[7], ELB_STATUS_CODE, &mut errors);
-        let be_sc = parse_property::<u16>(split_line[8], BE_STATUS_CODE, &mut errors);
-        let bytes_received = parse_property::<u64>(split_line[9], RECEIVED_BYTES, &mut errors);
-        let bytes_sent = parse_property::<u64>(split_line[10], SENT_BYTES, &mut errors);
+pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
+    let mut errors: Vec<ELBRecordParsingErrors> = Vec::new();
 
-        if errors.is_empty() {
-            Ok(Box::new(
-                ELBLogEntry {
-                    timestamp: ts.unwrap(),
-                    elb_name: split_line[1].to_string(),
-                    client_address: clnt_addr.unwrap(),
-                    backend_address: be_addr.unwrap(),
-                    request_processing_time: req_proc_time.unwrap(),
-                    backend_processing_time: be_proc_time.unwrap(),
-                    response_processing_time: res_proc_time.unwrap(),
-                    elb_status_code: elb_sc.unwrap(),
-                    backend_status_code: be_sc.unwrap(),
-                    received_bytes: bytes_received.unwrap(),
-                    sent_bytes: bytes_sent.unwrap(),
-                    request_method: split_line[11].trim_matches('"').to_string(),
-                    request_url: split_line[12].to_string(),
-                    request_http_version: split_line[13].trim_matches('"').to_string()
-                }
-            ))
+    {
+        //record is borrowed by the split method which means ownership of record cannot be
+        //transferred to ParsingErrors until the borrow is complete.
+        //Scoping this section of code seems more readable than creating a separate function
+        //just to mitigate the borrow.
+        let split_line: Vec<&str> = record.split(' ').collect();
+        if split_line.len() != ELB_RECORD_FIELD_COUNT {
+            errors.push(ELBRecordParsingErrors::MalformedRecord);
+            None
         } else {
-            Err(ParsingErrors {
-                record: line.clone(),
-                errors: errors
-            })
+            //TODO consider an enum representing the indices
+            let ts = parse_property::<DateTime<UTC>>(split_line[0], TIMESTAMP, &mut errors);
+            let clnt_addr = parse_property::<SocketAddrV4>(split_line[2], CLIENT_ADDRESS, &mut errors);
+            let be_addr = parse_property::<SocketAddrV4>(split_line[3], BACKEND_ADDRESS, &mut errors);
+            let req_proc_time = parse_property::<f32>(split_line[4], REQUEST_PROCESSING_TIME, &mut errors);
+            let be_proc_time = parse_property::<f32>(split_line[5], BACKEND_PROCESSING_TIME, &mut errors);
+            let res_proc_time = parse_property::<f32>(split_line[6], RESPONSE_PROCESSING_TIME, &mut errors);
+            let elb_sc = parse_property::<u16>(split_line[7], ELB_STATUS_CODE, &mut errors);
+            let be_sc = parse_property::<u16>(split_line[8], BE_STATUS_CODE, &mut errors);
+            let bytes_received = parse_property::<u64>(split_line[9], RECEIVED_BYTES, &mut errors);
+            let bytes_sent = parse_property::<u64>(split_line[10], SENT_BYTES, &mut errors);
+
+            if errors.is_empty() {
+                //If errors is empty it is more than likely parsing was successful and unwrap is safe.
+                Some(
+                    ELBRecord {
+                        timestamp: ts.unwrap(),
+                        elb_name: split_line[1].to_string(),
+                        client_address: clnt_addr.unwrap(),
+                        backend_address: be_addr.unwrap(),
+                        request_processing_time: req_proc_time.unwrap(),
+                        backend_processing_time: be_proc_time.unwrap(),
+                        response_processing_time: res_proc_time.unwrap(),
+                        elb_status_code: elb_sc.unwrap(),
+                        backend_status_code: be_sc.unwrap(),
+                        received_bytes: bytes_received.unwrap(),
+                        sent_bytes: bytes_sent.unwrap(),
+                        request_method: split_line[11].trim_matches('"').to_string(),
+                        request_url: split_line[12].to_string(),
+                        request_http_version: split_line[13].trim_matches('"').to_string()
+                    }
+                )
+            } else {
+                None
+            }
         }
-    } else {
-        errors.push(ELBLogEntryErrors::MalformedEntry);
+    }.map( |elb_rec|
+        Ok(Box::new(elb_rec))
+    ).unwrap_or_else( ||
         Err(ParsingErrors {
-            record: line.clone(),
+            record: record,
             errors: errors
         })
-    }
+    )
 }
 
-fn parse_property<T>(raw_prop: &str, prop_name: &'static str, errors: &mut Vec<ELBLogEntryErrors>) -> Option<T>
+//TODO Try to implement this on &str
+fn parse_property<T>(raw_prop: &str, prop_name: &'static str, errors: &mut Vec<ELBRecordParsingErrors>) -> Option<T>
     where T: FromStr,
     T::Err: Error + 'static,
 {
@@ -153,7 +172,7 @@ fn parse_property<T>(raw_prop: &str, prop_name: &'static str, errors: &mut Vec<E
 
         Err(e) => {
             errors.push(
-                ELBLogEntryErrors::ParsingError {
+                ELBRecordParsingErrors::ParsingError {
                     property: prop_name,
                     description: e.description().to_string(),
                 }
@@ -164,125 +183,123 @@ fn parse_property<T>(raw_prop: &str, prop_name: &'static str, errors: &mut Vec<E
 }
 
 //TODO test the error case.
-//TODO unite the nomenclature under entry (vs record)
-
 #[cfg(test)]
 mod tests {
-    use super::parse_line;
-    use super::ELBLogEntryErrors;
+    use super::parse_record;
+    use super::ELBRecordParsingErrors;
 
-    const TEST_LINE: &'static str = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
+    const TEST_RECORD: &'static str = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
     172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 7582 \
     \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
     ";
 
     #[test]
-	fn parse_line_returns_a_malformed_record_error_for_records_short_on_values() {
+	fn parse_record_returns_a_malformed_record_error_for_records_short_on_values() {
         let short_record = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
         172.16.1.5:9000 0.000039 200 200 0 7582 \
         \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\" \
         ";
 
-        let malformed_error = parse_line(&short_record.to_string()).unwrap_err().errors.pop();
+        let malformed_error = parse_record(short_record.to_string()).unwrap_err().errors.pop();
 
-		assert_eq!(malformed_error, Some(ELBLogEntryErrors::MalformedEntry))
+		assert_eq!(malformed_error, Some(ELBRecordParsingErrors::MalformedRecord))
 	}
 
     #[test]
-	fn parse_line_returns_a_log_entry_with_the_request_http_version() {
-        let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
+	fn parse_record_returns_a_record_with_the_request_http_version() {
+        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
 
-		assert_eq!(elb_log_entry.request_http_version, "HTTP/1.1")
+		assert_eq!(elb_record.request_http_version, "HTTP/1.1")
 	}
 
     #[test]
-	fn parse_line_returns_a_log_entry_with_the_request_url() {
-        let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
+	fn parse_record_returns_a_record_with_the_request_url() {
+        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
 
-		assert_eq!(elb_log_entry.request_url, "http://some.domain.com:80/path0/path1?param0=p0&param1=p1")
+		assert_eq!(elb_record.request_url, "http://some.domain.com:80/path0/path1?param0=p0&param1=p1")
 	}
 
     #[test]
-	fn parse_line_returns_a_log_entry_with_the_request_method() {
-        let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
+	fn parse_record_returns_a_record_with_the_request_method() {
+        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
 
-		assert_eq!(elb_log_entry.request_method, "GET")
+		assert_eq!(elb_record.request_method, "GET")
 	}
 
     #[test]
-	fn parse_line_returns_a_log_entry_with_the_sent_bytes() {
-        let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
+	fn parse_record_returns_a_record_with_the_sent_bytes() {
+        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
 
-		assert_eq!(elb_log_entry.sent_bytes, 7582)
+		assert_eq!(elb_record.sent_bytes, 7582)
 	}
 
     #[test]
-	fn parse_line_returns_a_log_entry_with_the_received_bytes() {
-        let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
+	fn parse_record_returns_a_record_with_the_received_bytes() {
+        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
 
-		assert_eq!(elb_log_entry.received_bytes, 0)
+		assert_eq!(elb_record.received_bytes, 0)
 	}
 
     #[test]
-	fn parse_line_returns_a_log_entry_with_the_backend_status_code() {
-        let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
+	fn parse_record_returns_a_record_with_the_backend_status_code() {
+        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
 
-		assert_eq!(elb_log_entry.backend_status_code, 200)
+		assert_eq!(elb_record.backend_status_code, 200)
 	}
 
     #[test]
-	fn parse_line_returns_a_log_entry_with_the_elb_status_code() {
-        let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
+	fn parse_record_returns_a_record_with_the_elb_status_code() {
+        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
 
-		assert_eq!(elb_log_entry.elb_status_code, 200)
+		assert_eq!(elb_record.elb_status_code, 200)
 	}
 
     #[test]
-	fn parse_line_returns_a_log_entry_with_the_response_processing_time() {
-        let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
+	fn parse_record_returns_a_record_with_the_response_processing_time() {
+        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
 
-		assert_eq!(elb_log_entry.response_processing_time, 0.00003)
+		assert_eq!(elb_record.response_processing_time, 0.00003)
 	}
 
     #[test]
-	fn parse_line_returns_a_log_entry_with_the_backend_processing_time() {
-        let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
+	fn parse_record_returns_a_record_with_the_backend_processing_time() {
+        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
 
-		assert_eq!(elb_log_entry.backend_processing_time, 0.145507)
+		assert_eq!(elb_record.backend_processing_time, 0.145507)
 	}
 
     #[test]
-	fn parse_line_returns_a_log_entry_with_the_request_processing_time() {
-        let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
+	fn parse_record_returns_a_record_with_the_request_processing_time() {
+        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
 
-		assert_eq!(elb_log_entry.request_processing_time, 0.000039)
+		assert_eq!(elb_record.request_processing_time, 0.000039)
 	}
 
     #[test]
-	fn parse_line_returns_a_log_entry_with_the_backend_address() {
-        let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
+	fn parse_record_returns_a_record_with_the_backend_address() {
+        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
 
-		assert_eq!(elb_log_entry.backend_address, "172.16.1.5:9000".parse().unwrap())
+		assert_eq!(elb_record.backend_address, "172.16.1.5:9000".parse().unwrap())
 	}
 
     #[test]
-	fn parse_line_returns_a_log_entry_with_the_client_address() {
-        let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
+	fn parse_record_returns_a_record_with_the_client_address() {
+        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
 
-		assert_eq!(elb_log_entry.client_address, "172.16.1.6:54814".parse().unwrap())
+		assert_eq!(elb_record.client_address, "172.16.1.6:54814".parse().unwrap())
 	}
 
     #[test]
-	fn parse_line_returns_a_log_entry_with_the_timestamp() {
-        let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
+	fn parse_record_returns_a_record_with_the_timestamp() {
+        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
 
-		assert_eq!(format!("{:?}", elb_log_entry.timestamp), "2015-08-15T23:43:05.302180Z")
+		assert_eq!(format!("{:?}", elb_record.timestamp), "2015-08-15T23:43:05.302180Z")
 	}
 
     #[test]
-	fn parse_line_returns_a_log_entry_with_the_elb_name() {
-        let elb_log_entry = parse_line(&TEST_LINE.to_string()).unwrap();
+	fn parse_record_returns_a_record_with_the_elb_name() {
+        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
 
-		assert_eq!(elb_log_entry.elb_name, "elb-name")
+		assert_eq!(elb_record.elb_name, "elb-name")
 	}
 }
