@@ -91,18 +91,6 @@ enum ELBRecordParsingErrors {
     LineReadError
 }
 
-const ELB_RECORD_FIELD_COUNT: usize = 14;
-const TIMESTAMP: &'static str = "timestamp";
-const CLIENT_ADDRESS: &'static str = "client address";
-const BACKEND_ADDRESS: &'static str = "backend address";
-const REQUEST_PROCESSING_TIME: &'static str = "request processing time";
-const BACKEND_PROCESSING_TIME: &'static str = "backend processing time";
-const RESPONSE_PROCESSING_TIME: &'static str = "response processing time";
-const ELB_STATUS_CODE: &'static str = "ELB status code";
-const BE_STATUS_CODE: &'static str = "backend status code";
-const RECEIVED_BYTES: &'static str = "received bytes";
-const SENT_BYTES: &'static str = "sent bytes";
-
 #[derive(Debug, PartialEq)]
 enum ELBRecordFields {
     Timestamp = 0,
@@ -126,8 +114,28 @@ impl ELBRecordFields {
   fn idx(self) -> usize {
     self as usize
   }
+
+  fn as_str(self) -> &'static str {
+      match self {
+          ELBRecordFields::Timestamp => "timestamp",
+          ELBRecordFields::ELBName => "ELB name",
+          ELBRecordFields::ClientAddress => "client address",
+          ELBRecordFields::BackendAddress => "backend address",
+          ELBRecordFields::RequestProcessingTime => "request processing time",
+          ELBRecordFields::BackendProcessingTime => "backend processing time",
+          ELBRecordFields::ResponseProcessingTime => "response processing time",
+          ELBRecordFields::ELBStatusCode => "ELB status code",
+          ELBRecordFields::BackendStatusCode => "backend status code",
+          ELBRecordFields::ReceivedBytes => "received bytes",
+          ELBRecordFields::SentBytes => "sent bytes",
+          ELBRecordFields::RequestMethod => "request method",
+          ELBRecordFields::RequestURL => "request URL",
+          ELBRecordFields::RequestHTTPVersion => "request HTTP version"
+      }
+  }
 }
 
+const ELB_RECORD_FIELD_COUNT: usize = 14;
 pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
     let mut errors: Vec<ELBRecordParsingErrors> = Vec::new();
 
@@ -141,16 +149,16 @@ pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
             errors.push(ELBRecordParsingErrors::MalformedRecord);
             None
         } else {
-            let ts = parse_property::<DateTime<UTC>>(split_line[ELBRecordFields::Timestamp.idx()], TIMESTAMP, &mut errors);
-            let clnt_addr = parse_property::<SocketAddrV4>(split_line[ELBRecordFields::ClientAddress.idx()], CLIENT_ADDRESS, &mut errors);
-            let be_addr = parse_property::<SocketAddrV4>(split_line[ELBRecordFields::BackendAddress.idx()], BACKEND_ADDRESS, &mut errors);
-            let req_proc_time = parse_property::<f32>(split_line[ELBRecordFields::RequestProcessingTime.idx()], REQUEST_PROCESSING_TIME, &mut errors);
-            let be_proc_time = parse_property::<f32>(split_line[ELBRecordFields::BackendProcessingTime.idx()], BACKEND_PROCESSING_TIME, &mut errors);
-            let res_proc_time = parse_property::<f32>(split_line[ELBRecordFields::ResponseProcessingTime.idx()], RESPONSE_PROCESSING_TIME, &mut errors);
-            let elb_sc = parse_property::<u16>(split_line[ELBRecordFields::ELBStatusCode.idx()], ELB_STATUS_CODE, &mut errors);
-            let be_sc = parse_property::<u16>(split_line[ELBRecordFields::BackendStatusCode.idx()], BE_STATUS_CODE, &mut errors);
-            let bytes_received = parse_property::<u64>(split_line[ELBRecordFields::ReceivedBytes.idx()], RECEIVED_BYTES, &mut errors);
-            let bytes_sent = parse_property::<u64>(split_line[ELBRecordFields::SentBytes.idx()], SENT_BYTES, &mut errors);
+            let ts = parse_property::<DateTime<UTC>>(split_line[ELBRecordFields::Timestamp.idx()], ELBRecordFields::Timestamp.as_str(), &mut errors);
+            let clnt_addr = parse_property::<SocketAddrV4>(split_line[ELBRecordFields::ClientAddress.idx()], ELBRecordFields::ClientAddress.as_str(), &mut errors);
+            let be_addr = parse_property::<SocketAddrV4>(split_line[ELBRecordFields::BackendAddress.idx()], ELBRecordFields::BackendAddress.as_str(), &mut errors);
+            let req_proc_time = parse_property::<f32>(split_line[ELBRecordFields::RequestProcessingTime.idx()], ELBRecordFields::RequestProcessingTime.as_str(), &mut errors);
+            let be_proc_time = parse_property::<f32>(split_line[ELBRecordFields::BackendProcessingTime.idx()], ELBRecordFields::BackendProcessingTime.as_str(), &mut errors);
+            let res_proc_time = parse_property::<f32>(split_line[ELBRecordFields::ResponseProcessingTime.idx()], ELBRecordFields::ResponseProcessingTime.as_str(), &mut errors);
+            let elb_sc = parse_property::<u16>(split_line[ELBRecordFields::ELBStatusCode.idx()], ELBRecordFields::ELBStatusCode.as_str(), &mut errors);
+            let be_sc = parse_property::<u16>(split_line[ELBRecordFields::BackendStatusCode.idx()], ELBRecordFields::BackendStatusCode.as_str(), &mut errors);
+            let bytes_received = parse_property::<u64>(split_line[ELBRecordFields::ReceivedBytes.idx()], ELBRecordFields::ReceivedBytes.as_str(), &mut errors);
+            let bytes_sent = parse_property::<u64>(split_line[ELBRecordFields::SentBytes.idx()], ELBRecordFields::SentBytes.as_str(), &mut errors);
 
             if errors.is_empty() {
                 //If errors is empty it is more than likely parsing was successful and unwrap is safe.
@@ -186,7 +194,7 @@ pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
     )
 }
 
-//TODO Try to implement this on &str
+//TODO Try to implement this on &str, or better, on vec.  The vec gets passed in with the field enum and the rest is taken care of by the method.  Which will shrink the API.
 fn parse_property<T>(raw_prop: &str, prop_name: &'static str, errors: &mut Vec<ELBRecordParsingErrors>) -> Option<T>
     where T: FromStr,
     T::Err: Error + 'static,
