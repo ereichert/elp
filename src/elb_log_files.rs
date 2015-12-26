@@ -103,6 +103,31 @@ const BE_STATUS_CODE: &'static str = "backend status code";
 const RECEIVED_BYTES: &'static str = "received bytes";
 const SENT_BYTES: &'static str = "sent bytes";
 
+#[derive(Debug, PartialEq)]
+enum ELBRecordFields {
+    Timestamp = 0,
+    ELBName,
+    ClientAddress,
+    BackendAddress,
+    RequestProcessingTime,
+    BackendProcessingTime,
+    ResponseProcessingTime,
+    ELBStatusCode,
+    BackendStatusCode,
+    ReceivedBytes,
+    SentBytes,
+    RequestMethod,
+    RequestURL,
+    RequestHTTPVersion
+}
+
+impl ELBRecordFields {
+
+  fn idx(self) -> usize {
+    self as usize
+  }
+}
+
 pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
     let mut errors: Vec<ELBRecordParsingErrors> = Vec::new();
 
@@ -116,24 +141,23 @@ pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
             errors.push(ELBRecordParsingErrors::MalformedRecord);
             None
         } else {
-            //TODO consider an enum representing the indices
-            let ts = parse_property::<DateTime<UTC>>(split_line[0], TIMESTAMP, &mut errors);
-            let clnt_addr = parse_property::<SocketAddrV4>(split_line[2], CLIENT_ADDRESS, &mut errors);
-            let be_addr = parse_property::<SocketAddrV4>(split_line[3], BACKEND_ADDRESS, &mut errors);
-            let req_proc_time = parse_property::<f32>(split_line[4], REQUEST_PROCESSING_TIME, &mut errors);
-            let be_proc_time = parse_property::<f32>(split_line[5], BACKEND_PROCESSING_TIME, &mut errors);
-            let res_proc_time = parse_property::<f32>(split_line[6], RESPONSE_PROCESSING_TIME, &mut errors);
-            let elb_sc = parse_property::<u16>(split_line[7], ELB_STATUS_CODE, &mut errors);
-            let be_sc = parse_property::<u16>(split_line[8], BE_STATUS_CODE, &mut errors);
-            let bytes_received = parse_property::<u64>(split_line[9], RECEIVED_BYTES, &mut errors);
-            let bytes_sent = parse_property::<u64>(split_line[10], SENT_BYTES, &mut errors);
+            let ts = parse_property::<DateTime<UTC>>(split_line[ELBRecordFields::Timestamp.idx()], TIMESTAMP, &mut errors);
+            let clnt_addr = parse_property::<SocketAddrV4>(split_line[ELBRecordFields::ClientAddress.idx()], CLIENT_ADDRESS, &mut errors);
+            let be_addr = parse_property::<SocketAddrV4>(split_line[ELBRecordFields::BackendAddress.idx()], BACKEND_ADDRESS, &mut errors);
+            let req_proc_time = parse_property::<f32>(split_line[ELBRecordFields::RequestProcessingTime.idx()], REQUEST_PROCESSING_TIME, &mut errors);
+            let be_proc_time = parse_property::<f32>(split_line[ELBRecordFields::BackendProcessingTime.idx()], BACKEND_PROCESSING_TIME, &mut errors);
+            let res_proc_time = parse_property::<f32>(split_line[ELBRecordFields::ResponseProcessingTime.idx()], RESPONSE_PROCESSING_TIME, &mut errors);
+            let elb_sc = parse_property::<u16>(split_line[ELBRecordFields::ELBStatusCode.idx()], ELB_STATUS_CODE, &mut errors);
+            let be_sc = parse_property::<u16>(split_line[ELBRecordFields::BackendStatusCode.idx()], BE_STATUS_CODE, &mut errors);
+            let bytes_received = parse_property::<u64>(split_line[ELBRecordFields::ReceivedBytes.idx()], RECEIVED_BYTES, &mut errors);
+            let bytes_sent = parse_property::<u64>(split_line[ELBRecordFields::SentBytes.idx()], SENT_BYTES, &mut errors);
 
             if errors.is_empty() {
                 //If errors is empty it is more than likely parsing was successful and unwrap is safe.
                 Some(
                     ELBRecord {
                         timestamp: ts.unwrap(),
-                        elb_name: split_line[1].to_string(),
+                        elb_name: split_line[ELBRecordFields::ELBName.idx()].to_string(),
                         client_address: clnt_addr.unwrap(),
                         backend_address: be_addr.unwrap(),
                         request_processing_time: req_proc_time.unwrap(),
@@ -143,9 +167,9 @@ pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
                         backend_status_code: be_sc.unwrap(),
                         received_bytes: bytes_received.unwrap(),
                         sent_bytes: bytes_sent.unwrap(),
-                        request_method: split_line[11].trim_matches('"').to_string(),
-                        request_url: split_line[12].to_string(),
-                        request_http_version: split_line[13].trim_matches('"').to_string()
+                        request_method: split_line[ELBRecordFields::RequestMethod.idx()].trim_matches('"').to_string(),
+                        request_url: split_line[ELBRecordFields::RequestURL.idx()].to_string(),
+                        request_http_version: split_line[ELBRecordFields::RequestHTTPVersion.idx()].trim_matches('"').to_string()
                     }
                 )
             } else {
