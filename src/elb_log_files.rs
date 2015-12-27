@@ -111,8 +111,8 @@ enum ELBRecordFields {
 
 impl ELBRecordFields {
 
-  fn idx(self) -> usize {
-    self as usize
+  fn idx(&self) -> usize {
+    *self as usize
   }
 
   fn as_str(&self) -> &'static str {
