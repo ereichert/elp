@@ -87,7 +87,7 @@ pub struct ParsingErrors {
 #[derive(Debug, PartialEq)]
 enum ELBRecordParsingErrors {
     MalformedRecord,
-    ParsingError { property: &'static str, description: String },
+    ParsingError { field_id: ELBRecordFields, description: String },
     LineReadError
 }
 
@@ -221,7 +221,7 @@ impl<'a> ELBRecordFieldParser for Vec<&'a str> {
             Err(e) => {
                 errors.push(
                     ELBRecordParsingErrors::ParsingError {
-                        property: field_id.as_str(),
+                        field_id: field_id,
                         description: e.description().to_string(),
                     }
                 );
