@@ -1,5 +1,11 @@
 ### cargo bench runs
 
+27/12/2015 -
+
+The parsing is complete.
+
+test bench_parse_line ... bench:       2,299 ns/iter (+/- 259)
+
 13/12/2015 -
 
 All of the properties have been migrated to specific types including the
