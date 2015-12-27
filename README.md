@@ -1,5 +1,11 @@
 ### Benchmark runs (using the --benchmark cli option)
 
+27/12/2015 -
+
+All of the parsing is done.
+
+Processed 121 files having 9340036 records in 32010 milliseconds.
+
 13/12/2015 -
 
 All of the properties have been migrated to specific types including the
