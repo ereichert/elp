@@ -91,7 +91,7 @@ enum ELBRecordParsingErrors {
     LineReadError
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 enum ELBRecordFields {
     Timestamp = 0,
     ELBName,
@@ -149,16 +149,16 @@ pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
             errors.push(ELBRecordParsingErrors::MalformedRecord);
             None
         } else {
-            let ts = parse_property::<DateTime<UTC>>(split_line[ELBRecordFields::Timestamp.idx()], ELBRecordFields::Timestamp.as_str(), &mut errors);
-            let clnt_addr = parse_property::<SocketAddrV4>(split_line[ELBRecordFields::ClientAddress.idx()], ELBRecordFields::ClientAddress.as_str(), &mut errors);
-            let be_addr = parse_property::<SocketAddrV4>(split_line[ELBRecordFields::BackendAddress.idx()], ELBRecordFields::BackendAddress.as_str(), &mut errors);
-            let req_proc_time = parse_property::<f32>(split_line[ELBRecordFields::RequestProcessingTime.idx()], ELBRecordFields::RequestProcessingTime.as_str(), &mut errors);
-            let be_proc_time = parse_property::<f32>(split_line[ELBRecordFields::BackendProcessingTime.idx()], ELBRecordFields::BackendProcessingTime.as_str(), &mut errors);
-            let res_proc_time = parse_property::<f32>(split_line[ELBRecordFields::ResponseProcessingTime.idx()], ELBRecordFields::ResponseProcessingTime.as_str(), &mut errors);
-            let elb_sc = parse_property::<u16>(split_line[ELBRecordFields::ELBStatusCode.idx()], ELBRecordFields::ELBStatusCode.as_str(), &mut errors);
-            let be_sc = parse_property::<u16>(split_line[ELBRecordFields::BackendStatusCode.idx()], ELBRecordFields::BackendStatusCode.as_str(), &mut errors);
-            let bytes_received = parse_property::<u64>(split_line[ELBRecordFields::ReceivedBytes.idx()], ELBRecordFields::ReceivedBytes.as_str(), &mut errors);
-            let bytes_sent = parse_property::<u64>(split_line[ELBRecordFields::SentBytes.idx()], ELBRecordFields::SentBytes.as_str(), &mut errors);
+            let ts = split_line.parse_property(ELBRecordFields::Timestamp, &mut errors);
+            let clnt_addr = split_line.parse_property(ELBRecordFields::ClientAddress, &mut errors);
+            let be_addr = split_line.parse_property(ELBRecordFields::BackendAddress, &mut errors);
+            let req_proc_time = split_line.parse_property(ELBRecordFields::RequestProcessingTime, &mut errors);
+            let be_proc_time = split_line.parse_property(ELBRecordFields::BackendProcessingTime, &mut errors);
+            let res_proc_time = split_line.parse_property(ELBRecordFields::ResponseProcessingTime, &mut errors);
+            let elb_sc = split_line.parse_property(ELBRecordFields::ELBStatusCode, &mut errors);
+            let be_sc = split_line.parse_property(ELBRecordFields::BackendStatusCode, &mut errors);
+            let bytes_received = split_line.parse_property(ELBRecordFields::ReceivedBytes, &mut errors);
+            let bytes_sent = split_line.parse_property(ELBRecordFields::SentBytes, &mut errors);
 
             if errors.is_empty() {
                 //If errors is empty it is more than likely parsing was successful and unwrap is safe.
@@ -194,22 +194,39 @@ pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
     )
 }
 
-//TODO Try to implement this on &str, or better, on vec.  The vec gets passed in with the field enum and the rest is taken care of by the method.  Which will shrink the API.
-fn parse_property<T>(raw_prop: &str, prop_name: &'static str, errors: &mut Vec<ELBRecordParsingErrors>) -> Option<T>
-    where T: FromStr,
-    T::Err: Error + 'static,
-{
-    match raw_prop.parse::<T>() {
-        Ok(parsed) => Some(parsed),
+trait ELBRecordFieldParser {
+    fn parse_property<T>(
+        &self,
+        field_id: ELBRecordFields,
+        errors: &mut Vec<ELBRecordParsingErrors>
+    ) -> Option<T>
+        where T: FromStr,
+        T::Err: Error + 'static;
+}
 
-        Err(e) => {
-            errors.push(
-                ELBRecordParsingErrors::ParsingError {
-                    property: prop_name,
-                    description: e.description().to_string(),
-                }
-            );
-            None
+impl<'a> ELBRecordFieldParser for Vec<&'a str> {
+
+    fn parse_property<T>(
+        &self,
+        field_id: ELBRecordFields,
+        errors: &mut Vec<ELBRecordParsingErrors>
+    ) -> Option<T>
+        where T: FromStr,
+        T::Err: Error + 'static,
+    {
+        let raw_prop = self[field_id.idx()];
+        match raw_prop.parse::<T>() {
+            Ok(parsed) => Some(parsed),
+
+            Err(e) => {
+                errors.push(
+                    ELBRecordParsingErrors::ParsingError {
+                        property: field_id.as_str(),
+                        description: e.description().to_string(),
+                    }
+                );
+                None
+            }
         }
     }
 }
