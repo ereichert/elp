@@ -115,8 +115,8 @@ impl ELBRecordFields {
     self as usize
   }
 
-  fn as_str(self) -> &'static str {
-      match self {
+  fn as_str(&self) -> &'static str {
+      match *self {
           ELBRecordFields::Timestamp => "timestamp",
           ELBRecordFields::ELBName => "ELB name",
           ELBRecordFields::ClientAddress => "client address",
