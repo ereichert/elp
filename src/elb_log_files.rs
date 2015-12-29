@@ -91,7 +91,7 @@ enum ELBRecordParsingErrors {
     LineReadError
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone)]
 enum ELBRecordFields {
     Timestamp = 0,
     ELBName,
@@ -112,7 +112,7 @@ enum ELBRecordFields {
 impl ELBRecordFields {
 
   fn idx(&self) -> usize {
-    *self as usize
+    self.clone() as usize
   }
 
   fn as_str(&self) -> &'static str {
