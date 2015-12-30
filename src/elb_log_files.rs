@@ -160,6 +160,7 @@ pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
             let bytes_received = split_line.parse_property(ELBRecordFields::ReceivedBytes, &mut errors);
             let bytes_sent = split_line.parse_property(ELBRecordFields::SentBytes, &mut errors);
 
+            //TODO try using .to_owned or .into instead of .to_string
             if errors.is_empty() {
                 //If errors is empty it is more than likely parsing was successful and unwrap is safe.
                 Some(
@@ -236,6 +237,7 @@ impl<'a> ELBRecordFieldParser for Vec<&'a str> {
 mod tests {
     use super::parse_record;
     use super::ELBRecordParsingErrors;
+    use super::ELBRecordFields;
 
     const TEST_RECORD: &'static str = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
     172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 7582 \
@@ -343,6 +345,21 @@ mod tests {
         let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
 
 		assert_eq!(format!("{:?}", elb_record.timestamp), "2015-08-15T23:43:05.302180Z")
+	}
+
+    #[test]
+	fn parse_record_returns_a_parsing_error_referencing_the_timestamp() {
+        let bad_record = "bad_timestamp elb-name 172.16.1.6:54814 \
+        172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 7582 \
+        \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
+        ";
+
+        let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+            ELBRecordParsingErrors::ParsingError { field_id, .. } => field_id,
+            _ => panic!(),
+        };
+
+		assert_eq!(error_field_id, ELBRecordFields::Timestamp)
 	}
 
     #[test]
