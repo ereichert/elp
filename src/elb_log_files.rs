@@ -285,11 +285,41 @@ mod tests {
 	}
 
     #[test]
+    fn parse_record_returns_a_parsing_error_referencing_the_sent_bytes_when_the_sent_bytes_is_malformed() {
+          let bad_record = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
+          172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 bad_sent_bytes \
+          \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
+          ";
+
+          let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+              ELBRecordParsingErrors::ParsingError { field_id, .. } => field_id,
+              _ => panic!(),
+          };
+
+      assert_eq!(error_field_id, ELBRecordFields::SentBytes)
+    }
+
+    #[test]
 	fn parse_record_returns_a_record_with_the_received_bytes() {
         let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
 
 		assert_eq!(elb_record.received_bytes, 0)
 	}
+
+    #[test]
+    fn parse_record_returns_a_parsing_error_referencing_the_received_bytes_when_the_received_bytes_is_malformed() {
+          let bad_record = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
+          172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 bad_received_bytes 7582 \
+          \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
+          ";
+
+          let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+              ELBRecordParsingErrors::ParsingError { field_id, .. } => field_id,
+              _ => panic!(),
+          };
+
+      assert_eq!(error_field_id, ELBRecordFields::ReceivedBytes)
+    }
 
     #[test]
 	fn parse_record_returns_a_record_with_the_backend_status_code() {
@@ -299,11 +329,41 @@ mod tests {
 	}
 
     #[test]
+    fn parse_record_returns_a_parsing_error_referencing_the_backend_status_code_when_the_backend_status_code_is_malformed() {
+          let bad_record = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
+          172.16.1.5:9000 0.000039 0.145507 0.00003 200 bad_backend_status_code 0 7582 \
+          \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
+          ";
+
+          let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+              ELBRecordParsingErrors::ParsingError { field_id, .. } => field_id,
+              _ => panic!(),
+          };
+
+      assert_eq!(error_field_id, ELBRecordFields::BackendStatusCode)
+    }
+
+    #[test]
 	fn parse_record_returns_a_record_with_the_elb_status_code() {
         let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
 
 		assert_eq!(elb_record.elb_status_code, 200)
 	}
+
+    #[test]
+    fn parse_record_returns_a_parsing_error_referencing_the_elb_status_code_when_the_elb_status_code_is_malformed() {
+          let bad_record = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
+          172.16.1.5:9000 0.000039 0.145507 0.00003 bad_elb_status_code 200 0 7582 \
+          \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
+          ";
+
+          let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+              ELBRecordParsingErrors::ParsingError { field_id, .. } => field_id,
+              _ => panic!(),
+          };
+
+      assert_eq!(error_field_id, ELBRecordFields::ELBStatusCode)
+    }
 
     #[test]
 	fn parse_record_returns_a_record_with_the_response_processing_time() {
@@ -313,11 +373,41 @@ mod tests {
 	}
 
     #[test]
+    fn parse_record_returns_a_parsing_error_referencing_the_response_processing_time_when_the_response_processing_time_is_malformed() {
+          let bad_record = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
+          172.16.1.5:9000 0.000039 0.145507 bad_response_processing_time 200 200 0 7582 \
+          \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
+          ";
+
+          let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+              ELBRecordParsingErrors::ParsingError { field_id, .. } => field_id,
+              _ => panic!(),
+          };
+
+      assert_eq!(error_field_id, ELBRecordFields::ResponseProcessingTime)
+    }
+
+    #[test]
 	fn parse_record_returns_a_record_with_the_backend_processing_time() {
         let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
 
 		assert_eq!(elb_record.backend_processing_time, 0.145507)
 	}
+
+    #[test]
+    fn parse_record_returns_a_parsing_error_referencing_the_backend_processing_time_when_the_backend_processing_time_is_malformed() {
+          let bad_record = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
+          172.16.1.5:9000 0.000039 bad_backend_processing_time 0.00003 200 200 0 7582 \
+          \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
+          ";
+
+          let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+              ELBRecordParsingErrors::ParsingError { field_id, .. } => field_id,
+              _ => panic!(),
+          };
+
+      assert_eq!(error_field_id, ELBRecordFields::BackendProcessingTime)
+    }
 
     #[test]
 	fn parse_record_returns_a_record_with_the_request_processing_time() {
@@ -327,10 +417,40 @@ mod tests {
 	}
 
     #[test]
+    fn parse_record_returns_a_parsing_error_referencing_the_request_processing_time_when_the_request_processing_time_is_malformed() {
+          let bad_record = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
+          172.16.1.5:9000 bad_request_processing_time 0.145507 0.00003 200 200 0 7582 \
+          \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
+          ";
+
+          let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+              ELBRecordParsingErrors::ParsingError { field_id, .. } => field_id,
+              _ => panic!(),
+          };
+
+      assert_eq!(error_field_id, ELBRecordFields::RequestProcessingTime)
+    }
+
+    #[test]
 	fn parse_record_returns_a_record_with_the_backend_address() {
         let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
 
 		assert_eq!(elb_record.backend_address, "172.16.1.5:9000".parse().unwrap())
+	}
+
+    #[test]
+	fn parse_record_returns_a_parsing_error_referencing_the_backend_address_when_the_backend_address_is_malformed() {
+        let bad_record = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
+        bad_backend_address 0.000039 0.145507 0.00003 200 200 0 7582 \
+        \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
+        ";
+
+        let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+            ELBRecordParsingErrors::ParsingError { field_id, .. } => field_id,
+            _ => panic!(),
+        };
+
+		assert_eq!(error_field_id, ELBRecordFields::BackendAddress)
 	}
 
     #[test]
@@ -341,6 +461,21 @@ mod tests {
 	}
 
     #[test]
+	fn parse_record_returns_a_parsing_error_referencing_the_client_address_when_the_client_address_is_malformed() {
+        let bad_record = "2015-08-15T23:43:05.302180Z elb-name bad_client_address \
+        172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 7582 \
+        \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
+        ";
+
+        let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+            ELBRecordParsingErrors::ParsingError { field_id, .. } => field_id,
+            _ => panic!(),
+        };
+
+		assert_eq!(error_field_id, ELBRecordFields::ClientAddress)
+	}
+
+    #[test]
 	fn parse_record_returns_a_record_with_the_timestamp() {
         let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
 
@@ -348,7 +483,7 @@ mod tests {
 	}
 
     #[test]
-	fn parse_record_returns_a_parsing_error_referencing_the_timestamp() {
+	fn parse_record_returns_a_parsing_error_referencing_the_timestamp_when_the_timestamp_is_malformed() {
         let bad_record = "bad_timestamp elb-name 172.16.1.6:54814 \
         172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 7582 \
         \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
