@@ -232,7 +232,6 @@ impl<'a> ELBRecordFieldParser for Vec<&'a str> {
     }
 }
 
-//TODO test the error case.
 #[cfg(test)]
 mod tests {
     use super::parse_record;
