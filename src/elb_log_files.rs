@@ -29,6 +29,7 @@ pub struct ELBRecord {
     request_http_version: String
 }
 
+//TODO try changing &mut Vec<DirEntry> to &mut [DirEntry]; ref https://www.reddit.com/r/rust/comments/3wr2st/rust_beginner_how_idiomatic_is_my_code/
 pub fn file_list(dir: &path::Path, filenames: &mut Vec<DirEntry>) -> Result<usize, WalkDirError> {
     for entry in WalkDir::new(dir).min_depth(1) {
         match entry {
@@ -42,6 +43,7 @@ pub fn file_list(dir: &path::Path, filenames: &mut Vec<DirEntry>) -> Result<usiz
 
 //TODO Reconsider logging based on the standard interfaces included with Rust.
 //TODO We really want to accept a function to handle the parsed lines.
+//TODO try changing Vec<DirEntry> to &[DirEntry]; ref https://www.reddit.com/r/rust/comments/3wr2st/rust_beginner_how_idiomatic_is_my_code/
 pub fn process_files(runtime_context: &::RuntimeContext, filenames: Vec<walkdir::DirEntry>) -> usize {
     let debug = runtime_context.debug;
     let mut record_count = 0;
@@ -76,7 +78,7 @@ pub fn process_files(runtime_context: &::RuntimeContext, filenames: Vec<walkdir:
     record_count
 }
 
-//TODO Take a look at the error handling once again.  This doesn't feel write given code you've read.
+//TODO Take a look at the error handling once again.  This doesn't feel right given code you've read.
 
 #[derive(Debug)]
 pub struct ParsingErrors {
