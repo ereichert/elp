@@ -43,8 +43,7 @@ pub fn file_list(dir: &path::Path, filenames: &mut Vec<DirEntry>) -> Result<usiz
 
 //TODO Reconsider logging based on the standard interfaces included with Rust.
 //TODO We really want to accept a function to handle the parsed lines.
-//TODO try changing Vec<DirEntry> to &[DirEntry]; ref https://www.reddit.com/r/rust/comments/3wr2st/rust_beginner_how_idiomatic_is_my_code/
-pub fn process_files(runtime_context: &::RuntimeContext, filenames: Vec<walkdir::DirEntry>) -> usize {
+pub fn process_files(runtime_context: &::RuntimeContext, filenames: &[walkdir::DirEntry]) -> usize {
     let debug = runtime_context.debug;
     let mut record_count = 0;
     for filename in filenames {

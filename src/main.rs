@@ -36,7 +36,7 @@ fn main() {
         Ok(num_files) => {
             number_of_files = num_files;
             debug!(debug, "Found {} files.", number_of_files);
-            number_of_records = elb_log_files::process_files(&runtime_context, filenames);
+            number_of_records = elb_log_files::process_files(&runtime_context, &filenames);
             debug!(debug, "Processed {} records in {} files.", number_of_records, num_files);
         },
         Err(e) => {
