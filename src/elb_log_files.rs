@@ -29,7 +29,6 @@ pub struct ELBRecord {
     request_http_version: String
 }
 
-//TODO try changing &mut Vec<DirEntry> to &mut [DirEntry]; ref https://www.reddit.com/r/rust/comments/3wr2st/rust_beginner_how_idiomatic_is_my_code/
 pub fn file_list(dir: &path::Path, filenames: &mut Vec<DirEntry>) -> Result<usize, WalkDirError> {
     for entry in WalkDir::new(dir).min_depth(1) {
         match entry {
