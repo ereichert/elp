@@ -1,5 +1,11 @@
 ### cargo bench runs
 
+02/01/2016 -
+
+Moved to_string() calls to to_owned where appropriate.
+
+test bench_parse_line ... bench:       2,097 ns/iter (+/- 348)
+
 27/12/2015 -
 
 The parsing is complete.

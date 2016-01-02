@@ -57,7 +57,7 @@ pub fn process_files(runtime_context: &::RuntimeContext, filenames: &[walkdir::D
 
                             Err(_) => {
                                 Err(ParsingErrors {
-                                    record: "".to_string(),
+                                    record: "".to_owned(),
                                     errors: vec![ELBRecordParsingErrors::LineReadError]
                                 })
                             }
@@ -166,7 +166,7 @@ pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
                 Some(
                     ELBRecord {
                         timestamp: ts.unwrap(),
-                        elb_name: split_line[ELBRecordFields::ELBName.idx()].to_string(),
+                        elb_name: split_line[ELBRecordFields::ELBName.idx()].to_owned(),
                         client_address: clnt_addr.unwrap(),
                         backend_address: be_addr.unwrap(),
                         request_processing_time: req_proc_time.unwrap(),
@@ -176,9 +176,9 @@ pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
                         backend_status_code: be_sc.unwrap(),
                         received_bytes: bytes_received.unwrap(),
                         sent_bytes: bytes_sent.unwrap(),
-                        request_method: split_line[ELBRecordFields::RequestMethod.idx()].trim_matches('"').to_string(),
-                        request_url: split_line[ELBRecordFields::RequestURL.idx()].to_string(),
-                        request_http_version: split_line[ELBRecordFields::RequestHTTPVersion.idx()].trim_matches('"').to_string()
+                        request_method: split_line[ELBRecordFields::RequestMethod.idx()].trim_matches('"').to_owned(),
+                        request_url: split_line[ELBRecordFields::RequestURL.idx()].to_owned(),
+                        request_http_version: split_line[ELBRecordFields::RequestHTTPVersion.idx()].trim_matches('"').to_owned()
                     }
                 )
             } else {
@@ -223,7 +223,7 @@ impl<'a> ELBRecordFieldParser for Vec<&'a str> {
                 errors.push(
                     ELBRecordParsingErrors::ParsingError {
                         field_id: field_id,
-                        description: e.description().to_string(),
+                        description: e.description().to_owned(),
                     }
                 );
                 None

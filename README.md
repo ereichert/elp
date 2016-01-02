@@ -1,5 +1,11 @@
 ### Benchmark runs (using the --benchmark cli option)
 
+02/01/2016 -
+
+Moved to_string() calls to to_owned where appropriate.
+
+Processed 121 files having 9340036 records in 28462 milliseconds.
+
 27/12/2015 -
 
 All of the parsing is done.
