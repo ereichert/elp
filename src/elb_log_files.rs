@@ -160,7 +160,6 @@ pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
             let bytes_received = split_line.parse_property(ELBRecordFields::ReceivedBytes, &mut errors);
             let bytes_sent = split_line.parse_property(ELBRecordFields::SentBytes, &mut errors);
 
-            //TODO try using .to_owned or .into instead of .to_string
             if errors.is_empty() {
                 //If errors is empty it is more than likely parsing was successful and unwrap is safe.
                 Some(
