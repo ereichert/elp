@@ -91,6 +91,7 @@ enum ELBRecordParsingErrors {
     LineReadError
 }
 
+//TODO consider implementing the index trait http://doc.rust-lang.org/nightly/std/ops/trait.Index.html
 #[derive(Debug, PartialEq, Clone)]
 enum ELBRecordFields {
     Timestamp = 0,
