@@ -58,7 +58,7 @@ pub fn process_files(runtime_context: &::RuntimeContext, filenames: &[walkdir::D
                             Err(_) => {
                                 Err(ParsingErrors {
                                     record: "".to_owned(),
-                                    errors: vec![ELBRecordParsingErrors::LineReadError]
+                                    errors: vec![ELBRecordParsingError::LineReadError]
                                 })
                             }
                         }
@@ -81,11 +81,11 @@ pub fn process_files(runtime_context: &::RuntimeContext, filenames: &[walkdir::D
 #[derive(Debug)]
 pub struct ParsingErrors {
     record: String,
-    errors: Vec<ELBRecordParsingErrors>,
+    errors: Vec<ELBRecordParsingError>,
 }
 
 #[derive(Debug, PartialEq)]
-enum ELBRecordParsingErrors {
+enum ELBRecordParsingError {
     MalformedRecord,
     ParsingError { field_id: ELBRecordFields, description: String },
     LineReadError
@@ -138,7 +138,7 @@ impl ELBRecordFields {
 
 const ELB_RECORD_FIELD_COUNT: usize = 14;
 pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
-    let mut errors: Vec<ELBRecordParsingErrors> = Vec::new();
+    let mut errors: Vec<ELBRecordParsingError> = Vec::new();
 
     {
         //record is borrowed by the split method which means ownership of record cannot be
@@ -147,7 +147,7 @@ pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
         //just to mitigate the borrow.
         let split_line: Vec<&str> = record.split(' ').collect();
         if split_line.len() != ELB_RECORD_FIELD_COUNT {
-            errors.push(ELBRecordParsingErrors::MalformedRecord);
+            errors.push(ELBRecordParsingError::MalformedRecord);
             None
         } else {
             let ts = split_line.parse_property(ELBRecordFields::Timestamp, &mut errors);
@@ -199,7 +199,7 @@ trait ELBRecordFieldParser {
     fn parse_property<T>(
         &self,
         field_id: ELBRecordFields,
-        errors: &mut Vec<ELBRecordParsingErrors>
+        errors: &mut Vec<ELBRecordParsingError>
     ) -> Option<T>
         where T: FromStr,
         T::Err: Error + 'static;
@@ -210,7 +210,7 @@ impl<'a> ELBRecordFieldParser for Vec<&'a str> {
     fn parse_property<T>(
         &self,
         field_id: ELBRecordFields,
-        errors: &mut Vec<ELBRecordParsingErrors>
+        errors: &mut Vec<ELBRecordParsingError>
     ) -> Option<T>
         where T: FromStr,
         T::Err: Error + 'static,
@@ -221,7 +221,7 @@ impl<'a> ELBRecordFieldParser for Vec<&'a str> {
 
             Err(e) => {
                 errors.push(
-                    ELBRecordParsingErrors::ParsingError {
+                    ELBRecordParsingError::ParsingError {
                         field_id: field_id,
                         description: e.description().to_owned(),
                     }
@@ -235,7 +235,7 @@ impl<'a> ELBRecordFieldParser for Vec<&'a str> {
 #[cfg(test)]
 mod tests {
     use super::parse_record;
-    use super::ELBRecordParsingErrors;
+    use super::ELBRecordParsingError;
     use super::ELBRecordFields;
 
     const TEST_RECORD: &'static str = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
@@ -252,7 +252,7 @@ mod tests {
 
         let malformed_error = parse_record(short_record.to_string()).unwrap_err().errors.pop();
 
-		assert_eq!(malformed_error, Some(ELBRecordParsingErrors::MalformedRecord))
+		assert_eq!(malformed_error, Some(ELBRecordParsingError::MalformedRecord))
 	}
 
     #[test]
@@ -291,7 +291,7 @@ mod tests {
           ";
 
           let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
-              ELBRecordParsingErrors::ParsingError { field_id, .. } => field_id,
+              ELBRecordParsingError::ParsingError { field_id, .. } => field_id,
               _ => panic!(),
           };
 
@@ -313,7 +313,7 @@ mod tests {
           ";
 
           let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
-              ELBRecordParsingErrors::ParsingError { field_id, .. } => field_id,
+              ELBRecordParsingError::ParsingError { field_id, .. } => field_id,
               _ => panic!(),
           };
 
@@ -335,7 +335,7 @@ mod tests {
           ";
 
           let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
-              ELBRecordParsingErrors::ParsingError { field_id, .. } => field_id,
+              ELBRecordParsingError::ParsingError { field_id, .. } => field_id,
               _ => panic!(),
           };
 
@@ -357,7 +357,7 @@ mod tests {
           ";
 
           let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
-              ELBRecordParsingErrors::ParsingError { field_id, .. } => field_id,
+              ELBRecordParsingError::ParsingError { field_id, .. } => field_id,
               _ => panic!(),
           };
 
@@ -379,7 +379,7 @@ mod tests {
           ";
 
           let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
-              ELBRecordParsingErrors::ParsingError { field_id, .. } => field_id,
+              ELBRecordParsingError::ParsingError { field_id, .. } => field_id,
               _ => panic!(),
           };
 
@@ -401,7 +401,7 @@ mod tests {
           ";
 
           let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
-              ELBRecordParsingErrors::ParsingError { field_id, .. } => field_id,
+              ELBRecordParsingError::ParsingError { field_id, .. } => field_id,
               _ => panic!(),
           };
 
@@ -423,7 +423,7 @@ mod tests {
           ";
 
           let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
-              ELBRecordParsingErrors::ParsingError { field_id, .. } => field_id,
+              ELBRecordParsingError::ParsingError { field_id, .. } => field_id,
               _ => panic!(),
           };
 
@@ -445,7 +445,7 @@ mod tests {
         ";
 
         let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
-            ELBRecordParsingErrors::ParsingError { field_id, .. } => field_id,
+            ELBRecordParsingError::ParsingError { field_id, .. } => field_id,
             _ => panic!(),
         };
 
@@ -467,7 +467,7 @@ mod tests {
         ";
 
         let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
-            ELBRecordParsingErrors::ParsingError { field_id, .. } => field_id,
+            ELBRecordParsingError::ParsingError { field_id, .. } => field_id,
             _ => panic!(),
         };
 
@@ -489,7 +489,7 @@ mod tests {
         ";
 
         let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
-            ELBRecordParsingErrors::ParsingError { field_id, .. } => field_id,
+            ELBRecordParsingError::ParsingError { field_id, .. } => field_id,
             _ => panic!(),
         };
 
