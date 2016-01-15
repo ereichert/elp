@@ -89,19 +89,17 @@ pub struct ParsingErrors {
 #[derive(Debug, PartialEq)]
 enum ELBRecordParsingError {
     MalformedRecord,
-    ParsingError { field_id: ELBRecordFields, description: String },
+    ParsingError { field_id: ELBRecordField, description: String },
     LineReadError
 }
 
 impl Display for ELBRecordParsingError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        // match *self {
-        //     // Both underlying errors already impl `Display`, so we defer to
-        //     // their implementations.
-        //     CliError::Io(ref err) => write!(f, "IO error: {}", err),
-        //     CliError::Parse(ref err) => write!(f, "Parse error: {}", err),
-        // }
-        unimplemented!()
+        match *self {
+            ELBRecordParsingError::MalformedRecord => write!(f, "Record is malformed."),
+            ELBRecordParsingError::ParsingError { ref field_id, ref description } => write!(f, "Parsing of field {} failed with the following error: {}.", field_id, description),
+            ELBRecordParsingError::LineReadError => write!(f, "Unable to read a line."),
+        }
     }
 }
 
@@ -131,7 +129,7 @@ impl Error for ELBRecordParsingError {
 
 //TODO consider implementing the index trait http://doc.rust-lang.org/nightly/std/ops/trait.Index.html
 #[derive(Debug, PartialEq, Clone)]
-enum ELBRecordFields {
+enum ELBRecordField {
     Timestamp = 0,
     ELBName,
     ClientAddress,
@@ -148,30 +146,32 @@ enum ELBRecordFields {
     RequestHTTPVersion
 }
 
-impl ELBRecordFields {
+impl ELBRecordField {
 
   fn idx(&self) -> usize {
     self.clone() as usize
   }
+}
 
-  fn as_str(&self) -> &'static str {
-      match *self {
-          ELBRecordFields::Timestamp => "timestamp",
-          ELBRecordFields::ELBName => "ELB name",
-          ELBRecordFields::ClientAddress => "client address",
-          ELBRecordFields::BackendAddress => "backend address",
-          ELBRecordFields::RequestProcessingTime => "request processing time",
-          ELBRecordFields::BackendProcessingTime => "backend processing time",
-          ELBRecordFields::ResponseProcessingTime => "response processing time",
-          ELBRecordFields::ELBStatusCode => "ELB status code",
-          ELBRecordFields::BackendStatusCode => "backend status code",
-          ELBRecordFields::ReceivedBytes => "received bytes",
-          ELBRecordFields::SentBytes => "sent bytes",
-          ELBRecordFields::RequestMethod => "request method",
-          ELBRecordFields::RequestURL => "request URL",
-          ELBRecordFields::RequestHTTPVersion => "request HTTP version"
-      }
-  }
+impl Display for ELBRecordField {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match *self {
+            ELBRecordField::Timestamp => write!(f, "timestamp"),
+            ELBRecordField::ELBName => write!(f, "ELB name"),
+            ELBRecordField::ClientAddress => write!(f, "client address"),
+            ELBRecordField::BackendAddress => write!(f, "backend address"),
+            ELBRecordField::RequestProcessingTime => write!(f, "request processing time"),
+            ELBRecordField::BackendProcessingTime => write!(f, "backend processing time"),
+            ELBRecordField::ResponseProcessingTime => write!(f, "response processing time"),
+            ELBRecordField::ELBStatusCode => write!(f, "ELB status code"),
+            ELBRecordField::BackendStatusCode => write!(f, "backend status code"),
+            ELBRecordField::ReceivedBytes => write!(f, "received bytes"),
+            ELBRecordField::SentBytes => write!(f, "sent bytes"),
+            ELBRecordField::RequestMethod => write!(f, "request method"),
+            ELBRecordField::RequestURL => write!(f, "request URL"),
+            ELBRecordField::RequestHTTPVersion => write!(f, "request HTTP version")
+        }
+    }
 }
 
 const ELB_RECORD_FIELD_COUNT: usize = 14;
@@ -188,23 +188,23 @@ pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
             errors.push(ELBRecordParsingError::MalformedRecord);
             None
         } else {
-            let ts = split_line.parse_property(ELBRecordFields::Timestamp, &mut errors);
-            let clnt_addr = split_line.parse_property(ELBRecordFields::ClientAddress, &mut errors);
-            let be_addr = split_line.parse_property(ELBRecordFields::BackendAddress, &mut errors);
-            let req_proc_time = split_line.parse_property(ELBRecordFields::RequestProcessingTime, &mut errors);
-            let be_proc_time = split_line.parse_property(ELBRecordFields::BackendProcessingTime, &mut errors);
-            let res_proc_time = split_line.parse_property(ELBRecordFields::ResponseProcessingTime, &mut errors);
-            let elb_sc = split_line.parse_property(ELBRecordFields::ELBStatusCode, &mut errors);
-            let be_sc = split_line.parse_property(ELBRecordFields::BackendStatusCode, &mut errors);
-            let bytes_received = split_line.parse_property(ELBRecordFields::ReceivedBytes, &mut errors);
-            let bytes_sent = split_line.parse_property(ELBRecordFields::SentBytes, &mut errors);
+            let ts = split_line.parse_property(ELBRecordField::Timestamp, &mut errors);
+            let clnt_addr = split_line.parse_property(ELBRecordField::ClientAddress, &mut errors);
+            let be_addr = split_line.parse_property(ELBRecordField::BackendAddress, &mut errors);
+            let req_proc_time = split_line.parse_property(ELBRecordField::RequestProcessingTime, &mut errors);
+            let be_proc_time = split_line.parse_property(ELBRecordField::BackendProcessingTime, &mut errors);
+            let res_proc_time = split_line.parse_property(ELBRecordField::ResponseProcessingTime, &mut errors);
+            let elb_sc = split_line.parse_property(ELBRecordField::ELBStatusCode, &mut errors);
+            let be_sc = split_line.parse_property(ELBRecordField::BackendStatusCode, &mut errors);
+            let bytes_received = split_line.parse_property(ELBRecordField::ReceivedBytes, &mut errors);
+            let bytes_sent = split_line.parse_property(ELBRecordField::SentBytes, &mut errors);
 
             if errors.is_empty() {
                 //If errors is empty it is more than likely parsing was successful and unwrap is safe.
                 Some(
                     ELBRecord {
                         timestamp: ts.unwrap(),
-                        elb_name: split_line[ELBRecordFields::ELBName.idx()].to_owned(),
+                        elb_name: split_line[ELBRecordField::ELBName.idx()].to_owned(),
                         client_address: clnt_addr.unwrap(),
                         backend_address: be_addr.unwrap(),
                         request_processing_time: req_proc_time.unwrap(),
@@ -214,9 +214,9 @@ pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
                         backend_status_code: be_sc.unwrap(),
                         received_bytes: bytes_received.unwrap(),
                         sent_bytes: bytes_sent.unwrap(),
-                        request_method: split_line[ELBRecordFields::RequestMethod.idx()].trim_matches('"').to_owned(),
-                        request_url: split_line[ELBRecordFields::RequestURL.idx()].to_owned(),
-                        request_http_version: split_line[ELBRecordFields::RequestHTTPVersion.idx()].trim_matches('"').to_owned()
+                        request_method: split_line[ELBRecordField::RequestMethod.idx()].trim_matches('"').to_owned(),
+                        request_url: split_line[ELBRecordField::RequestURL.idx()].to_owned(),
+                        request_http_version: split_line[ELBRecordField::RequestHTTPVersion.idx()].trim_matches('"').to_owned()
                     }
                 )
             } else {
@@ -236,7 +236,7 @@ pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
 trait ELBRecordFieldParser {
     fn parse_property<T>(
         &self,
-        field_id: ELBRecordFields,
+        field_id: ELBRecordField,
         errors: &mut Vec<ELBRecordParsingError>
     ) -> Option<T>
         where T: FromStr,
@@ -247,7 +247,7 @@ impl<'a> ELBRecordFieldParser for Vec<&'a str> {
 
     fn parse_property<T>(
         &self,
-        field_id: ELBRecordFields,
+        field_id: ELBRecordField,
         errors: &mut Vec<ELBRecordParsingError>
     ) -> Option<T>
         where T: FromStr,
@@ -274,7 +274,7 @@ impl<'a> ELBRecordFieldParser for Vec<&'a str> {
 mod tests {
     use super::parse_record;
     use super::ELBRecordParsingError;
-    use super::ELBRecordFields;
+    use super::ELBRecordField;
 
     const TEST_RECORD: &'static str = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
     172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 7582 \
@@ -333,7 +333,7 @@ mod tests {
               _ => panic!(),
           };
 
-      assert_eq!(error_field_id, ELBRecordFields::SentBytes)
+      assert_eq!(error_field_id, ELBRecordField::SentBytes)
     }
 
     #[test]
@@ -355,7 +355,7 @@ mod tests {
               _ => panic!(),
           };
 
-      assert_eq!(error_field_id, ELBRecordFields::ReceivedBytes)
+      assert_eq!(error_field_id, ELBRecordField::ReceivedBytes)
     }
 
     #[test]
@@ -377,7 +377,7 @@ mod tests {
               _ => panic!(),
           };
 
-      assert_eq!(error_field_id, ELBRecordFields::BackendStatusCode)
+      assert_eq!(error_field_id, ELBRecordField::BackendStatusCode)
     }
 
     #[test]
@@ -399,7 +399,7 @@ mod tests {
               _ => panic!(),
           };
 
-      assert_eq!(error_field_id, ELBRecordFields::ELBStatusCode)
+      assert_eq!(error_field_id, ELBRecordField::ELBStatusCode)
     }
 
     #[test]
@@ -421,7 +421,7 @@ mod tests {
               _ => panic!(),
           };
 
-      assert_eq!(error_field_id, ELBRecordFields::ResponseProcessingTime)
+      assert_eq!(error_field_id, ELBRecordField::ResponseProcessingTime)
     }
 
     #[test]
@@ -443,7 +443,7 @@ mod tests {
               _ => panic!(),
           };
 
-      assert_eq!(error_field_id, ELBRecordFields::BackendProcessingTime)
+      assert_eq!(error_field_id, ELBRecordField::BackendProcessingTime)
     }
 
     #[test]
@@ -465,7 +465,7 @@ mod tests {
               _ => panic!(),
           };
 
-      assert_eq!(error_field_id, ELBRecordFields::RequestProcessingTime)
+      assert_eq!(error_field_id, ELBRecordField::RequestProcessingTime)
     }
 
     #[test]
@@ -487,7 +487,7 @@ mod tests {
             _ => panic!(),
         };
 
-		assert_eq!(error_field_id, ELBRecordFields::BackendAddress)
+		assert_eq!(error_field_id, ELBRecordField::BackendAddress)
 	}
 
     #[test]
@@ -509,7 +509,7 @@ mod tests {
             _ => panic!(),
         };
 
-		assert_eq!(error_field_id, ELBRecordFields::ClientAddress)
+		assert_eq!(error_field_id, ELBRecordField::ClientAddress)
 	}
 
     #[test]
@@ -531,7 +531,7 @@ mod tests {
             _ => panic!(),
         };
 
-		assert_eq!(error_field_id, ELBRecordFields::Timestamp)
+		assert_eq!(error_field_id, ELBRecordField::Timestamp)
 	}
 
     #[test]
