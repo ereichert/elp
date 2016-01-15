@@ -1,8 +1,8 @@
 extern crate walkdir;
 extern crate chrono;
 
-use std::path;
-use self::walkdir::{WalkDir, DirEntry, Error as WalkDirError};
+use std::path::Path;
+use self::walkdir::{WalkDir, DirEntry};
 use std::fs::File;
 use std::io::BufReader;
 use std::io::BufRead;
@@ -10,6 +10,8 @@ use self::chrono::{DateTime, UTC};
 use std::error::Error;
 use std::str::FromStr;
 use std::net::SocketAddrV4;
+use std::fmt::{Formatter, Display};
+use std::fmt;
 
 #[derive(Debug)]
 pub struct ELBRecord {
@@ -29,7 +31,7 @@ pub struct ELBRecord {
     request_http_version: String
 }
 
-pub fn file_list(dir: &path::Path, filenames: &mut Vec<DirEntry>) -> Result<usize, WalkDirError> {
+pub fn file_list(dir: &Path, filenames: &mut Vec<DirEntry>) -> Result<usize, walkdir::Error> {
     for entry in WalkDir::new(dir).min_depth(1) {
         match entry {
             Err(err) => return Err(err),
@@ -42,7 +44,7 @@ pub fn file_list(dir: &path::Path, filenames: &mut Vec<DirEntry>) -> Result<usiz
 
 //TODO Reconsider logging based on the standard interfaces included with Rust.
 //TODO We really want to accept a function to handle the parsed lines.
-pub fn process_files(runtime_context: &::RuntimeContext, filenames: &[walkdir::DirEntry]) -> usize {
+pub fn process_files(runtime_context: &::RuntimeContext, filenames: &[DirEntry]) -> usize {
     let debug = runtime_context.debug;
     let mut record_count = 0;
     for filename in filenames {
@@ -89,6 +91,42 @@ enum ELBRecordParsingError {
     MalformedRecord,
     ParsingError { field_id: ELBRecordFields, description: String },
     LineReadError
+}
+
+impl Display for ELBRecordParsingError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        // match *self {
+        //     // Both underlying errors already impl `Display`, so we defer to
+        //     // their implementations.
+        //     CliError::Io(ref err) => write!(f, "IO error: {}", err),
+        //     CliError::Parse(ref err) => write!(f, "Parse error: {}", err),
+        // }
+        unimplemented!()
+    }
+}
+
+impl Error for ELBRecordParsingError {
+    fn description(&self) -> &str {
+        // // Both underlying errors already impl `Error`, so we defer to their
+        // // implementations.
+        // match *self {
+        //     CliError::Io(ref err) => err.description(),
+        //     CliError::Parse(ref err) => err.description(),
+        // }
+        unimplemented!()
+    }
+
+    fn cause(&self) -> Option<&Error> {
+        // match *self {
+        //     // N.B. Both of these implicitly cast `err` from their concrete
+        //     // types (either `&io::Error` or `&num::ParseIntError`)
+        //     // to a trait object `&Error`. This works because both error types
+        //     // implement `Error`.
+        //     CliError::Io(ref err) => Some(err),
+        //     CliError::Parse(ref err) => Some(err),
+        // }
+        unimplemented!()
+    }
 }
 
 //TODO consider implementing the index trait http://doc.rust-lang.org/nightly/std/ops/trait.Index.html
