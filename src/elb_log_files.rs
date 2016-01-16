@@ -78,8 +78,6 @@ pub fn process_files(runtime_context: &::RuntimeContext, filenames: &[DirEntry])
     record_count
 }
 
-//TODO Take a look at the error handling once again.  This doesn't feel right given code you've read.
-
 #[derive(Debug)]
 pub struct ParsingErrors {
     record: String,
@@ -105,25 +103,15 @@ impl Display for ELBRecordParsingError {
 
 impl Error for ELBRecordParsingError {
     fn description(&self) -> &str {
-        // // Both underlying errors already impl `Error`, so we defer to their
-        // // implementations.
-        // match *self {
-        //     CliError::Io(ref err) => err.description(),
-        //     CliError::Parse(ref err) => err.description(),
-        // }
-        unimplemented!()
+        match *self {
+            ELBRecordParsingError::MalformedRecord => "malformed record",
+            ELBRecordParsingError::ParsingError { .. } => "field parsing failed",
+            ELBRecordParsingError::LineReadError => "failed to read line",
+        }
     }
 
     fn cause(&self) -> Option<&Error> {
-        // match *self {
-        //     // N.B. Both of these implicitly cast `err` from their concrete
-        //     // types (either `&io::Error` or `&num::ParseIntError`)
-        //     // to a trait object `&Error`. This works because both error types
-        //     // implement `Error`.
-        //     CliError::Io(ref err) => Some(err),
-        //     CliError::Parse(ref err) => Some(err),
-        // }
-        unimplemented!()
+        Some(self)
     }
 }
 
