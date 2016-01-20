@@ -12,6 +12,7 @@ use std::str::FromStr;
 use std::net::SocketAddrV4;
 use std::fmt::{Formatter, Display};
 use std::fmt;
+use std::ops::Index;
 
 #[derive(Debug)]
 pub struct ELBRecord {
@@ -115,9 +116,8 @@ impl Error for ELBRecordParsingError {
     }
 }
 
-//TODO consider implementing the index trait http://doc.rust-lang.org/nightly/std/ops/trait.Index.html
 #[derive(Debug, PartialEq, Clone)]
-enum ELBRecordField {
+pub enum ELBRecordField {
     Timestamp = 0,
     ELBName,
     ClientAddress,
@@ -134,11 +134,12 @@ enum ELBRecordField {
     RequestHTTPVersion
 }
 
-impl ELBRecordField {
+impl<'a> Index<ELBRecordField> for Vec<&'a str> {
+    type Output = str;
 
-  fn idx(&self) -> usize {
-    self.clone() as usize
-  }
+    fn index(&self, idx: ELBRecordField) -> &str {
+        self[idx as usize]
+    }
 }
 
 impl Display for ELBRecordField {
@@ -192,7 +193,7 @@ pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
                 Some(
                     ELBRecord {
                         timestamp: ts.unwrap(),
-                        elb_name: split_line[ELBRecordField::ELBName.idx()].to_owned(),
+                        elb_name: split_line[ELBRecordField::ELBName].to_owned(),
                         client_address: clnt_addr.unwrap(),
                         backend_address: be_addr.unwrap(),
                         request_processing_time: req_proc_time.unwrap(),
@@ -202,9 +203,9 @@ pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
                         backend_status_code: be_sc.unwrap(),
                         received_bytes: bytes_received.unwrap(),
                         sent_bytes: bytes_sent.unwrap(),
-                        request_method: split_line[ELBRecordField::RequestMethod.idx()].trim_matches('"').to_owned(),
-                        request_url: split_line[ELBRecordField::RequestURL.idx()].to_owned(),
-                        request_http_version: split_line[ELBRecordField::RequestHTTPVersion.idx()].trim_matches('"').to_owned()
+                        request_method: split_line[ELBRecordField::RequestMethod].trim_matches('"').to_owned(),
+                        request_url: split_line[ELBRecordField::RequestURL].to_owned(),
+                        request_http_version: split_line[ELBRecordField::RequestHTTPVersion].trim_matches('"').to_owned()
                     }
                 )
             } else {
@@ -241,7 +242,7 @@ impl<'a> ELBRecordFieldParser for Vec<&'a str> {
         where T: FromStr,
         T::Err: Error + 'static,
     {
-        let raw_prop = self[field_id.idx()];
+        let raw_prop = &self[field_id.clone()];
         match raw_prop.parse::<T>() {
             Ok(parsed) => Some(parsed),
 
