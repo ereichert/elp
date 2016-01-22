@@ -2,3 +2,11 @@
 name = "aws-abacus"
 version = "0.1.0"
 authors = ["Eric D. Reichert <eric@reichertconsulting.com>"]
+
+[dependencies]
+docopt = "0.6"
+rustc-serialize = "0.3"
+gag = "0.1.6"
+lazy_static = "0.1.15"
+walkdir = "0.1.5"
+chrono = "0.2.17"
