@@ -116,6 +116,12 @@ impl Error for ELBRecordParsingError {
     }
 }
 
+//DON'T USE THIS IN YOUR CODE!!!
+//This is really an implementation detail and shouldn't be exposed as part of the public API.
+//Unfortunately it must be made public in order to implement the Index trait.
+//I could use the newtype pattern but the newtype pattern forces another level of indirection
+//with no gain besides reducing the exposure a little. I hope that in the future we'll be able to
+//implement public methods without having to expose, what should be, private details.
 #[derive(Debug, PartialEq, Clone)]
 pub enum ELBRecordField {
     Timestamp = 0,
