@@ -2,13 +2,13 @@ extern crate rustc_serialize;
 extern crate docopt;
 #[macro_use]
 extern crate aws_abacus;
+#[macro_use]
+extern crate log;
 extern crate walkdir;
 extern crate chrono;
-
 use docopt::Docopt;
 use std::path;
 use aws_abacus::elb_log_files;
-use aws_abacus::RuntimeContext;
 use chrono::{DateTime, UTC};
 
 fn main() {
@@ -16,12 +16,8 @@ fn main() {
                             .and_then(|d| d.decode())
                             .unwrap_or_else(|e| e.exit());
 
-    let runtime_context = RuntimeContext {
-        debug: args.flag_debug,
-    };
-    let debug = runtime_context.debug;
     let log_location = &path::Path::new(&args.arg_log_location);
-    debug!(debug, "Running summary on {}.", log_location.to_str().unwrap());
+    debug!("Running summary on {}.", log_location.to_str().unwrap());
 
     let start: Option<DateTime<UTC>> = if args.flag_benchmark {
         Some(UTC::now())
@@ -35,9 +31,9 @@ fn main() {
     match elb_log_files::file_list(log_location, &mut filenames) {
         Ok(num_files) => {
             number_of_files = num_files;
-            debug!(debug, "Found {} files.", number_of_files);
-            number_of_records = elb_log_files::process_files(&runtime_context, &filenames);
-            debug!(debug, "Processed {} records in {} files.", number_of_records, num_files);
+            debug!("Found {} files.", number_of_files);
+            number_of_records = elb_log_files::process_files(&filenames);
+            debug!("Processed {} records in {} files.", number_of_records, num_files);
         },
         Err(e) => {
             println!("ERROR: {}", e);

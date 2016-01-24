@@ -43,13 +43,11 @@ pub fn file_list(dir: &Path, filenames: &mut Vec<DirEntry>) -> Result<usize, wal
 }
 
 
-//TODO Reconsider logging based on the standard interfaces included with Rust.
 //TODO We really want to accept a function to handle the parsed lines.
-pub fn process_files(runtime_context: &::RuntimeContext, filenames: &[DirEntry]) -> usize {
-    let debug = runtime_context.debug;
+pub fn process_files(filenames: &[DirEntry]) -> usize {
     let mut record_count = 0;
     for filename in filenames {
-        debug!(debug, "Processing file {}.", filename.path().display());
+        debug!("Processing file {}.", filename.path().display());
         match File::open(filename.path()) {
             Ok(file) => {
                 let buffered_file = BufReader::new(&file);
@@ -68,10 +66,10 @@ pub fn process_files(runtime_context: &::RuntimeContext, filenames: &[DirEntry])
                     })
                     .collect();
                 record_count += recs.len();
-                debug!(debug, "Found {} records in file {}.", recs.len(), filename.path().display());
+                debug!("Found {} records in file {}.", recs.len(), filename.path().display());
             },
             Err(e) => {
-                println!("ERROR: {}", e);
+                error!("Could not open file. {}", e);
             }
         }
     }
