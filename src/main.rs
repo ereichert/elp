@@ -10,6 +10,7 @@ use docopt::Docopt;
 use std::path;
 use aws_abacus::elb_log_files;
 use chrono::{DateTime, UTC};
+use aws_abacus::elb_log_files::ELBRecord;
 
 fn main() {
     let args: Args = Docopt::new(USAGE)
@@ -72,4 +73,19 @@ struct Args {
     arg_log_location: String,
     flag_debug: bool,
     flag_benchmark: bool,
+}
+
+//Need to produce system_name,yyyy-mm-dd,req_addr,count
+fn aggregate_elb_record(record: ELBRecord, aggregated_records: Vec<ELBRecord>) {
+
+}
+
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+	fn false_does_not_equal_true() {
+		assert_eq!(true, false)
+	}
 }
