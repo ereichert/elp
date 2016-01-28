@@ -75,17 +75,74 @@ struct Args {
     flag_benchmark: bool,
 }
 
-//Need to produce system_name,yyyy-mm-dd,req_addr,count
-fn aggregate_elb_record(record: ELBRecord, aggregated_records: Vec<ELBRecord>) {
-
-}
-
-
 #[cfg(test)]
 mod tests {
 
+    use std::collections::HashMap;
+
+    const TEST_RECORD: &'static str = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
+    172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 7582 \
+    \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
+    ";
+
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    struct AggregateELBRecord {
+        day: String,
+        client_address: String,
+        system_name: String,
+        public_id: i64,
+    }
+
+    //Need to produce system_name,yyyy-mm-dd,req_addr,count
+    fn aggregate_record(aggregation: &mut HashMap<AggregateELBRecord, i64>, aggregate_record: AggregateELBRecord) -> () {
+        let total = aggregation.entry(aggregate_record).or_insert(0);
+        *total += 1;
+    }
+
     #[test]
-	fn false_does_not_equal_true() {
-		assert_eq!(true, false)
+	fn inserting_two_records_with_different_values_creates_two_entries_each_recorded_once() {
+        let mut agg: HashMap<AggregateELBRecord, i64> = HashMap::new();
+
+        let ar0 = AggregateELBRecord {
+            day: "2015-08-15".to_owned(),
+            client_address: "172.16.1.6:54814".to_owned(),
+            system_name: "sys1".to_owned(),
+            public_id: 8880
+        };
+
+        let ar1 = AggregateELBRecord {
+            day: "2015-08-15".to_owned(),
+            client_address: "172.16.1.6:54814".to_owned(),
+            system_name: "sys1".to_owned(),
+            public_id: 8888
+        };
+
+        aggregate_record(&mut agg, ar0);
+        aggregate_record(&mut agg, ar1);
+
+        assert_eq!(agg.len(), 2);
+        for (_, total) in agg {
+            assert_eq!(total, 1)
+        }
+	}
+
+    #[test]
+	fn inserting_two_records_with_the_same_values_increases_the_total_correctly() {
+        let mut agg: HashMap<AggregateELBRecord, i64> = HashMap::new();
+
+        let ar0 = AggregateELBRecord {
+            day: "2015-08-15".to_owned(),
+            client_address: "172.16.1.6:54814".to_owned(),
+            system_name: "sys1".to_owned(),
+            public_id: 8888
+        };
+
+        let ar1 = ar0.clone();
+        let ar3 = ar0.clone();
+
+        aggregate_record(&mut agg, ar0);
+        aggregate_record(&mut agg, ar1);
+
+        assert_eq!(agg[&ar3], 2);
 	}
 }

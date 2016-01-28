@@ -28,7 +28,7 @@ pub struct ELBRecord {
     received_bytes: u64,
     sent_bytes: u64,
     request_method: String,
-    request_url: String,
+    request_url: String,  //TODO this should be a more appropriate type.
     request_http_version: String
 }
 
