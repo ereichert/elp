@@ -45,7 +45,40 @@ pub fn file_list(dir: &Path, filenames: &mut Vec<DirEntry>) -> Result<usize, wal
 
 pub fn new_process_files<H>(filenames: &[DirEntry], record_handler: H) -> usize
     where H: Fn(ParsingResult) -> () {
-        0
+
+    let mut total_record_count = 0;
+    for filename in filenames {
+        debug!("Processing file {}.", filename.path().display());
+        match File::open(filename.path()) {
+            Ok(file) => {
+                let mut file_record_count = 0;
+                for possible_line in BufReader::new(&file).lines() {
+                    file_record_count += 1;
+                    match possible_line {
+                        Ok(record) => record_handler(parse_record(record)),
+
+                        Err(_) => {
+                            record_handler(
+                                Err(ParsingErrors {
+                                    record: "".to_owned(),
+                                    errors: vec![ELBRecordParsingError::LineReadError]
+                                })
+                            )
+                        }
+                    }
+                };
+
+                debug!("Found {} records in file {}.", file_record_count, filename.path().display());
+                total_record_count += file_record_count;
+            },
+
+            Err(e) => {
+                error!("Could not open file. {}", e);
+            }
+        }
+    }
+
+    total_record_count
 }
 
 pub fn process_files(filenames: &[DirEntry]) -> usize {
