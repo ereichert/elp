@@ -6,6 +6,7 @@ extern crate aws_abacus;
 extern crate log;
 extern crate walkdir;
 extern crate chrono;
+extern crate env_logger;
 use docopt::Docopt;
 use std::path;
 use aws_abacus::elb_log_files;
@@ -14,6 +15,7 @@ use aws_abacus::elb_log_files::ELBRecord;
 use aws_abacus::elb_log_files::ParsingResult;
 
 fn main() {
+    env_logger::init().unwrap();
     let args: Args = Docopt::new(USAGE)
                             .and_then(|d| d.decode())
                             .unwrap_or_else(|e| e.exit());
