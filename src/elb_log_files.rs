@@ -16,20 +16,20 @@ use std::ops::Index;
 
 #[derive(Debug)]
 pub struct ELBRecord {
-    timestamp: DateTime<UTC>,
-    elb_name: String,
-    client_address: SocketAddrV4,
-    backend_address: SocketAddrV4,
-    request_processing_time: f32,
-    backend_processing_time: f32,
-    response_processing_time: f32,
-    elb_status_code: u16,
-    backend_status_code: u16,
-    received_bytes: u64,
-    sent_bytes: u64,
-    request_method: String,
-    request_url: String,
-    request_http_version: String
+    pub timestamp: DateTime<UTC>,
+    pub elb_name: String,
+    pub client_address: SocketAddrV4,
+    pub backend_address: SocketAddrV4,
+    pub request_processing_time: f32,
+    pub backend_processing_time: f32,
+    pub response_processing_time: f32,
+    pub elb_status_code: u16,
+    pub backend_status_code: u16,
+    pub received_bytes: u64,
+    pub sent_bytes: u64,
+    pub request_method: String,
+    pub request_url: String,
+    pub request_http_version: String
 }
 
 pub fn file_list(dir: &Path, filenames: &mut Vec<DirEntry>) -> Result<usize, walkdir::Error> {
@@ -43,8 +43,8 @@ pub fn file_list(dir: &Path, filenames: &mut Vec<DirEntry>) -> Result<usize, wal
 }
 
 
-pub fn process_files<H>(filenames: &[DirEntry], record_handler: &H) -> usize
-    where H: Fn(ParsingResult) -> () {
+pub fn process_files<H>(filenames: &[DirEntry], record_handler: &mut H) -> usize
+    where H: FnMut(ParsingResult) -> () {
 
     let mut total_record_count = 0;
     for filename in filenames {
@@ -65,8 +65,8 @@ pub fn process_files<H>(filenames: &[DirEntry], record_handler: &H) -> usize
     total_record_count
 }
 
-fn handle_file<H>(file: File, record_handler: &H) -> usize
-    where H: Fn(ParsingResult) -> () {
+fn handle_file<H>(file: File, record_handler: &mut H) -> usize
+    where H: FnMut(ParsingResult) -> () {
     let mut file_record_count = 0;
     for possible_record in BufReader::new(&file).lines() {
         file_record_count += 1;
@@ -180,7 +180,7 @@ impl Display for ELBRecordField {
 
 pub type ParsingResult = Result<Box<ELBRecord>, ParsingErrors>;
 const ELB_RECORD_FIELD_COUNT: usize = 14;
-pub fn parse_record(record: String) -> ParsingResult {
+fn parse_record(record: String) -> ParsingResult {
     let mut errors: Vec<ELBRecordParsingError> = Vec::new();
 
     {
