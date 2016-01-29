@@ -43,7 +43,7 @@ pub fn file_list(dir: &Path, filenames: &mut Vec<DirEntry>) -> Result<usize, wal
 }
 
 
-pub fn process_files<H>(filenames: &[DirEntry], record_handler: H) -> usize
+pub fn process_files<H>(filenames: &[DirEntry], record_handler: &H) -> usize
     where H: Fn(ParsingResult) -> () {
 
     let mut total_record_count = 0;
@@ -51,23 +51,7 @@ pub fn process_files<H>(filenames: &[DirEntry], record_handler: H) -> usize
         debug!("Processing file {}.", filename.path().display());
         match File::open(filename.path()) {
             Ok(file) => {
-                let mut file_record_count = 0;
-                for possible_record in BufReader::new(&file).lines() {
-                    file_record_count += 1;
-                    match possible_record {
-                        Ok(record) => record_handler(parse_record(record)),
-
-                        Err(_) => {
-                            record_handler(
-                                Err(ParsingErrors {
-                                    record: "".to_owned(),
-                                    errors: vec![ELBRecordParsingError::LineReadError]
-                                })
-                            )
-                        }
-                    }
-                };
-
+                let file_record_count = handle_file(file, record_handler);
                 debug!("Found {} records in file {}.", file_record_count, filename.path().display());
                 total_record_count += file_record_count;
             },
@@ -79,6 +63,28 @@ pub fn process_files<H>(filenames: &[DirEntry], record_handler: H) -> usize
     }
 
     total_record_count
+}
+
+fn handle_file<H>(file: File, record_handler: &H) -> usize
+    where H: Fn(ParsingResult) -> () {
+    let mut file_record_count = 0;
+    for possible_record in BufReader::new(&file).lines() {
+        file_record_count += 1;
+        match possible_record {
+            Ok(record) => record_handler(parse_record(record)),
+
+            Err(_) => {
+                record_handler(
+                    Err(ParsingErrors {
+                        record: "".to_owned(),
+                        errors: vec![ELBRecordParsingError::LineReadError]
+                    })
+                )
+            }
+        }
+    };
+
+    file_record_count
 }
 
 #[derive(Debug)]
