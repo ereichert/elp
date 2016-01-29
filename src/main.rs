@@ -11,6 +11,7 @@ use std::path;
 use aws_abacus::elb_log_files;
 use chrono::{DateTime, UTC};
 use aws_abacus::elb_log_files::ELBRecord;
+use aws_abacus::elb_log_files::ParsingResult;
 
 fn main() {
     let args: Args = Docopt::new(USAGE)
@@ -33,7 +34,7 @@ fn main() {
         Ok(num_files) => {
             number_of_files = num_files;
             debug!("Found {} files.", number_of_files);
-            number_of_records = elb_log_files::process_files(&filenames);
+            number_of_records = elb_log_files::process_files(&filenames, parsing_result_handler);
             debug!("Processed {} records in {} files.", number_of_records, num_files);
         },
         Err(e) => {
@@ -53,6 +54,10 @@ fn main() {
         },
         None => {},
     };
+}
+
+fn parsing_result_handler(parsing_result: ParsingResult) -> () {
+    //println!("made it to the handler.");
 }
 
 const USAGE: &'static str = "
