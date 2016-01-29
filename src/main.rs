@@ -68,17 +68,19 @@ struct AggregateELBRecord {
     day: String,
     client_address: String,
     system_name: String,
-    public_id: u64,
+    // public_id: u64,
 }
 
 fn parsing_result_handler(parsing_result: ParsingResult, aggregation: &mut HashMap<AggregateELBRecord, i64>) -> () {
     match parsing_result {
         Ok(elb_record) => {
+            //36labs,2016-01-07,173.70.188.85,3
+            // println!("{}", elb_record.client_address.ip().to_string());
             let aer = AggregateELBRecord {
-                day: "".to_owned(),
-                client_address: "".to_owned(),
+                day: elb_record.timestamp.format("%Y-%m-%d").to_string(),
+                client_address: elb_record.client_address.ip().to_string(),
                 system_name: "".to_owned(),
-                public_id: elb_record.sent_bytes
+                // public_id: elb_record.sent_bytes
             };
             aggregate_record(aer, aggregation);
         },
