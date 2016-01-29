@@ -43,7 +43,11 @@ pub fn file_list(dir: &Path, filenames: &mut Vec<DirEntry>) -> Result<usize, wal
 }
 
 
-//TODO We really want to accept a function to handle the parsed lines.
+pub fn new_process_files<H>(filenames: &[DirEntry], record_handler: H) -> usize
+    where H: Fn(ParsingResult) -> () {
+        0
+}
+
 pub fn process_files(filenames: &[DirEntry]) -> usize {
     let mut record_count = 0;
     for filename in filenames {
@@ -168,8 +172,9 @@ impl Display for ELBRecordField {
     }
 }
 
+pub type ParsingResult = Result<Box<ELBRecord>, ParsingErrors>;
 const ELB_RECORD_FIELD_COUNT: usize = 14;
-pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
+pub fn parse_record(record: String) -> ParsingResult {
     let mut errors: Vec<ELBRecordParsingError> = Vec::new();
 
     {
