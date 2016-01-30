@@ -15,6 +15,16 @@ use aws_abacus::elb_log_files::ParsingResult;
 use std::collections::HashMap;
 extern crate urlparse;
 use urlparse::{Url, urlparse};
+use std::io::Write;
+
+macro_rules! println_stderr(
+    ($($arg:tt)*) => (
+        match writeln!(&mut ::std::io::stderr(), $($arg)* ) {
+            Ok(_) => {},
+            Err(x) => panic!("Unable to write to stderr: {}", x),
+        }
+    )
+);
 
 fn main() {
     env_logger::init().unwrap();
@@ -95,7 +105,7 @@ fn parsing_result_handler(parsing_result: ParsingResult, aggregation: &mut HashM
         },
 
         Err(errors) => {
-            println!("{}", errors.record);
+            println_stderr!("{}", errors.record);
         }
     }
 }
