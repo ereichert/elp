@@ -50,7 +50,13 @@ fn main() {
     };
 
     for (aggregate, total) in &agg {
-        println!("{},{},{},{}", aggregate.system_name, aggregate.day, aggregate.client_address, total);
+        println!(
+            "{},{},{},{}",
+            aggregate.system_name,
+            aggregate.day,
+            aggregate.client_address,
+            total
+        );
     };
 
     match start {
@@ -74,7 +80,6 @@ struct AggregateELBRecord {
     day: String,
     client_address: String,
     system_name: String,
-    // public_id: u64,
 }
 
 fn parsing_result_handler(parsing_result: ParsingResult, aggregation: &mut HashMap<AggregateELBRecord, i64>) -> () {
@@ -85,7 +90,6 @@ fn parsing_result_handler(parsing_result: ParsingResult, aggregation: &mut HashM
                 day: elb_record.timestamp.format("%Y-%m-%d").to_string(),
                 client_address: elb_record.client_address.ip().to_string(),
                 system_name: parse_system_name(&url).unwrap_or("UNDEFINED_SYSTEM".to_owned()),
-                // public_id: elb_record.sent_bytes
             };
             aggregate_record(aer, aggregation);
         },
