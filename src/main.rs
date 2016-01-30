@@ -164,14 +164,12 @@ mod tests {
             day: "2015-08-15".to_owned(),
             client_address: "172.16.1.6:54814".to_owned(),
             system_name: "sys1".to_owned(),
-            public_id: 8880
         };
 
         let ar1 = AggregateELBRecord {
             day: "2015-08-15".to_owned(),
             client_address: "172.16.1.6:54814".to_owned(),
-            system_name: "sys1".to_owned(),
-            public_id: 8888
+            system_name: "sys2".to_owned(),
         };
 
         aggregate_record(ar0, &mut agg);
@@ -191,7 +189,6 @@ mod tests {
             day: "2015-08-15".to_owned(),
             client_address: "172.16.1.6:54814".to_owned(),
             system_name: "sys1".to_owned(),
-            public_id: 8888
         };
 
         let ar1 = ar0.clone();
