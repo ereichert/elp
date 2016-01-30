@@ -41,49 +41,50 @@ fn main() {
         None
     };
 
-    let mut number_of_files = 0;
-    let mut number_of_records = 0;
     let mut filenames = Vec::new();
-    let mut agg: HashMap<AggregateELBRecord, i64> = HashMap::new();
     match elb_log_files::file_list(log_location, &mut filenames) {
         Ok(num_files) => {
-            number_of_files = num_files;
-            debug!("Found {} files.", number_of_files);
-            number_of_records = elb_log_files::process_files(&filenames, &mut |parsing_result: ParsingResult| {
+            let mut agg: HashMap<AggregateELBRecord, i64> = HashMap::new();
+            debug!("Found {} files.", num_files);
+
+            let number_of_records = elb_log_files::process_files(&filenames, &mut |parsing_result: ParsingResult| {
                 parsing_result_handler(parsing_result, &mut agg);
             });
             debug!("Processed {} records in {} files.", number_of_records, num_files);
+
+            for (aggregate, total) in &agg {
+                println!(
+                    "{},{},{},{}",
+                    aggregate.system_name,
+                    aggregate.day,
+                    aggregate.client_address,
+                    total
+                );
+            };
+
+            match start {
+                Some(s) => {
+                    let end = UTC::now();
+                    let time = end - s;
+                    println!("Processed {} files having {} records in {} milliseconds and produced {} aggregates.",
+                        num_files,
+                        number_of_records,
+                        time.num_milliseconds(),
+                        agg.len()
+                    );
+                },
+                None => {},
+            };
+
+            std::process::exit(0);
         },
+
         Err(e) => {
-            println!("ERROR: {}", e);
+            println_stderr!("The following error occurred while trying to get the list of files. {}", e);
+            std::process::exit(1);
         },
-    };
-
-    for (aggregate, total) in &agg {
-        println!(
-            "{},{},{},{}",
-            aggregate.system_name,
-            aggregate.day,
-            aggregate.client_address,
-            total
-        );
-    };
-
-    match start {
-        Some(s) => {
-            let end = UTC::now();
-            let time = end - s;
-            println!("Processed {} files having {} records in {} milliseconds and produced {} aggregates.",
-                number_of_files,
-                number_of_records,
-                time.num_milliseconds(),
-                agg.len()
-            );
-        },
-        None => {},
     };
 }
-
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct AggregateELBRecord {
