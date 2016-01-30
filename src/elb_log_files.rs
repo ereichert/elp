@@ -32,6 +32,45 @@ pub struct ELBRecord {
     pub request_http_version: String
 }
 
+pub type ParsingResult = Result<Box<ELBRecord>, ParsingErrors>;
+
+#[derive(Debug)]
+pub struct ParsingErrors {
+    pub record: String,
+    pub errors: Vec<ELBRecordParsingError>,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ELBRecordParsingError {
+    MalformedRecord,
+    ParsingError { field_id: ELBRecordField, description: String },
+    LineReadError
+}
+
+impl Display for ELBRecordParsingError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match *self {
+            ELBRecordParsingError::MalformedRecord => write!(f, "Record is malformed."),
+            ELBRecordParsingError::ParsingError { ref field_id, ref description } => write!(f, "Parsing of field {} failed with the following error: {}.", field_id, description),
+            ELBRecordParsingError::LineReadError => write!(f, "Unable to read a line."),
+        }
+    }
+}
+
+impl Error for ELBRecordParsingError {
+    fn description(&self) -> &str {
+        match *self {
+            ELBRecordParsingError::MalformedRecord => "malformed record",
+            ELBRecordParsingError::ParsingError { .. } => "field parsing failed",
+            ELBRecordParsingError::LineReadError => "failed to read line",
+        }
+    }
+
+    fn cause(&self) -> Option<&Error> {
+        Some(self)
+    }
+}
+
 pub fn file_list(dir: &Path, filenames: &mut Vec<DirEntry>) -> Result<usize, walkdir::Error> {
     for entry in WalkDir::new(dir).min_depth(1) {
         match entry {
@@ -41,7 +80,6 @@ pub fn file_list(dir: &Path, filenames: &mut Vec<DirEntry>) -> Result<usize, wal
     }
     Ok(filenames.len())
 }
-
 
 pub fn process_files<H>(filenames: &[DirEntry], record_handler: &mut H) -> usize
     where H: FnMut(ParsingResult) -> () {
@@ -85,43 +123,6 @@ fn handle_file<H>(file: File, record_handler: &mut H) -> usize
     };
 
     file_record_count
-}
-
-#[derive(Debug)]
-pub struct ParsingErrors {
-    pub record: String,
-    pub errors: Vec<ELBRecordParsingError>,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum ELBRecordParsingError {
-    MalformedRecord,
-    ParsingError { field_id: ELBRecordField, description: String },
-    LineReadError
-}
-
-impl Display for ELBRecordParsingError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match *self {
-            ELBRecordParsingError::MalformedRecord => write!(f, "Record is malformed."),
-            ELBRecordParsingError::ParsingError { ref field_id, ref description } => write!(f, "Parsing of field {} failed with the following error: {}.", field_id, description),
-            ELBRecordParsingError::LineReadError => write!(f, "Unable to read a line."),
-        }
-    }
-}
-
-impl Error for ELBRecordParsingError {
-    fn description(&self) -> &str {
-        match *self {
-            ELBRecordParsingError::MalformedRecord => "malformed record",
-            ELBRecordParsingError::ParsingError { .. } => "field parsing failed",
-            ELBRecordParsingError::LineReadError => "failed to read line",
-        }
-    }
-
-    fn cause(&self) -> Option<&Error> {
-        Some(self)
-    }
 }
 
 //DON'T USE THIS IN YOUR CODE!!!
@@ -178,7 +179,6 @@ impl Display for ELBRecordField {
     }
 }
 
-pub type ParsingResult = Result<Box<ELBRecord>, ParsingErrors>;
 const ELB_RECORD_FIELD_COUNT: usize = 14;
 fn parse_record(record: String) -> ParsingResult {
     let mut errors: Vec<ELBRecordParsingError> = Vec::new();
