@@ -101,23 +101,11 @@ fn parsing_result_handler(parsing_result: ParsingResult, aggregation: &mut HashM
 }
 
 fn parse_system_name(url: &Url) -> Option<String> {
-    match url.get_parsed_query() {
-        Some(query_map) => {
-            match query_map.get("system") {
-                Some(systems) => {
-                    Some(systems[0].clone())
-                },
-
-                None => {
-                    None
-                }
-            }
-        },
-
-        None => {
-            None
-        }
-    }
+    url.get_parsed_query().map( |query_map|
+        query_map.get("system").map( |systems|
+            systems[0].clone()
+        )
+    ).unwrap_or_else( || None )
 }
 
 fn aggregate_record(aggregate_record: AggregateELBRecord, aggregation: &mut HashMap<AggregateELBRecord, i64>) -> () {
