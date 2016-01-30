@@ -14,7 +14,7 @@ use chrono::{DateTime, UTC};
 use aws_abacus::elb_log_files::ParsingResult;
 use std::collections::HashMap;
 extern crate urlparse;
-use urlparse::urlparse;
+use urlparse::{Url, urlparse};
 
 fn main() {
     env_logger::init().unwrap();
@@ -81,28 +81,10 @@ fn parsing_result_handler(parsing_result: ParsingResult, aggregation: &mut HashM
     match parsing_result {
         Ok(elb_record) => {
             let url = urlparse(&elb_record.request_url);
-            let system = match url.get_parsed_query() {
-                Some(query_map) => {
-                    match query_map.get("system") {
-                        Some(systems) => {
-                            systems[0].clone()
-                        },
-
-                        None => {
-                            "".to_owned()
-                        }
-                    }
-                },
-
-                None => {
-                    "".to_owned()
-                }
-            };
-
             let aer = AggregateELBRecord {
                 day: elb_record.timestamp.format("%Y-%m-%d").to_string(),
                 client_address: elb_record.client_address.ip().to_string(),
-                system_name: system,
+                system_name: parse_system_name(&url).unwrap_or("UNDEFINED_SYSTEM".to_owned()),
                 // public_id: elb_record.sent_bytes
             };
             aggregate_record(aer, aggregation);
@@ -110,6 +92,26 @@ fn parsing_result_handler(parsing_result: ParsingResult, aggregation: &mut HashM
 
         Err(errors) => {
 
+        }
+    }
+}
+
+fn parse_system_name(url: &Url) -> Option<String> {
+    match url.get_parsed_query() {
+        Some(query_map) => {
+            match query_map.get("system") {
+                Some(systems) => {
+                    Some(systems[0].clone())
+                },
+
+                None => {
+                    None
+                }
+            }
+        },
+
+        None => {
+            None
         }
     }
 }
