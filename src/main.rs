@@ -1,18 +1,20 @@
 extern crate rustc_serialize;
-extern crate docopt;
 #[macro_use]
 extern crate aws_abacus;
 #[macro_use]
 extern crate log;
 extern crate walkdir;
-extern crate chrono;
 extern crate env_logger;
+extern crate docopt;
 use docopt::Docopt;
 use std::path;
 use aws_abacus::elb_log_files;
+extern crate chrono;
 use chrono::{DateTime, UTC};
 use aws_abacus::elb_log_files::ParsingResult;
 use std::collections::HashMap;
+extern crate urlparse;
+use urlparse::urlparse;
 
 fn main() {
     env_logger::init().unwrap();
@@ -47,6 +49,10 @@ fn main() {
         },
     };
 
+    for (aggregate, total) in &agg {
+        println!("{},{},{},{}", aggregate.system_name, aggregate.day, aggregate.client_address, total);
+    };
+
     match start {
         Some(s) => {
             let end = UTC::now();
@@ -74,12 +80,29 @@ struct AggregateELBRecord {
 fn parsing_result_handler(parsing_result: ParsingResult, aggregation: &mut HashMap<AggregateELBRecord, i64>) -> () {
     match parsing_result {
         Ok(elb_record) => {
-            //36labs,2016-01-07,173.70.188.85,3
-            // println!("{}", elb_record.client_address.ip().to_string());
+            let url = urlparse(&elb_record.request_url);
+            let system = match url.get_parsed_query() {
+                Some(query_map) => {
+                    match query_map.get("system") {
+                        Some(systems) => {
+                            systems[0].clone()
+                        },
+
+                        None => {
+                            "".to_owned()
+                        }
+                    }
+                },
+
+                None => {
+                    "".to_owned()
+                }
+            };
+
             let aer = AggregateELBRecord {
                 day: elb_record.timestamp.format("%Y-%m-%d").to_string(),
                 client_address: elb_record.client_address.ip().to_string(),
-                system_name: "".to_owned(),
+                system_name: system,
                 // public_id: elb_record.sent_bytes
             };
             aggregate_record(aer, aggregation);
@@ -91,7 +114,6 @@ fn parsing_result_handler(parsing_result: ParsingResult, aggregation: &mut HashM
     }
 }
 
-//Need to produce system_name,yyyy-mm-dd,req_addr,count
 fn aggregate_record(aggregate_record: AggregateELBRecord, aggregation: &mut HashMap<AggregateELBRecord, i64>) -> () {
     let total = aggregation.entry(aggregate_record).or_insert(0);
     *total += 1;
