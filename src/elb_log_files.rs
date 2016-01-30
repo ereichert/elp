@@ -89,12 +89,12 @@ fn handle_file<H>(file: File, record_handler: &mut H) -> usize
 
 #[derive(Debug)]
 pub struct ParsingErrors {
-    record: String,
-    errors: Vec<ELBRecordParsingError>,
+    pub record: String,
+    pub errors: Vec<ELBRecordParsingError>,
 }
 
 #[derive(Debug, PartialEq)]
-enum ELBRecordParsingError {
+pub enum ELBRecordParsingError {
     MalformedRecord,
     ParsingError { field_id: ELBRecordField, description: String },
     LineReadError

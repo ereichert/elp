@@ -95,7 +95,7 @@ fn parsing_result_handler(parsing_result: ParsingResult, aggregation: &mut HashM
         },
 
         Err(errors) => {
-
+            println!("{}", errors.record);
         }
     }
 }
