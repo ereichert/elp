@@ -16,75 +16,32 @@ use std::ops::Index;
 
 #[derive(Debug)]
 pub struct ELBRecord {
-    timestamp: DateTime<UTC>,
-    elb_name: String,
-    client_address: SocketAddrV4,
-    backend_address: SocketAddrV4,
-    request_processing_time: f32,
-    backend_processing_time: f32,
-    response_processing_time: f32,
-    elb_status_code: u16,
-    backend_status_code: u16,
-    received_bytes: u64,
-    sent_bytes: u64,
-    request_method: String,
-    request_url: String,
-    request_http_version: String
+    pub timestamp: DateTime<UTC>,
+    pub elb_name: String,
+    pub client_address: SocketAddrV4,
+    pub backend_address: SocketAddrV4,
+    pub request_processing_time: f32,
+    pub backend_processing_time: f32,
+    pub response_processing_time: f32,
+    pub elb_status_code: u16,
+    pub backend_status_code: u16,
+    pub received_bytes: u64,
+    pub sent_bytes: u64,
+    pub request_method: String,
+    pub request_url: String,
+    pub request_http_version: String
 }
 
-pub fn file_list(dir: &Path, filenames: &mut Vec<DirEntry>) -> Result<usize, walkdir::Error> {
-    for entry in WalkDir::new(dir).min_depth(1) {
-        match entry {
-            Err(err) => return Err(err),
-            Ok(entry) => filenames.push(entry),
-        }
-    }
-    Ok(filenames.len())
-}
-
-
-//TODO We really want to accept a function to handle the parsed lines.
-pub fn process_files(filenames: &[DirEntry]) -> usize {
-    let mut record_count = 0;
-    for filename in filenames {
-        debug!("Processing file {}.", filename.path().display());
-        match File::open(filename.path()) {
-            Ok(file) => {
-                let buffered_file = BufReader::new(&file);
-                let recs: Vec<_> = buffered_file.lines()
-                    .map(|possible_line| {
-                        match possible_line {
-                            Ok(record) => parse_record(record),
-
-                            Err(_) => {
-                                Err(ParsingErrors {
-                                    record: "".to_owned(),
-                                    errors: vec![ELBRecordParsingError::LineReadError]
-                                })
-                            }
-                        }
-                    })
-                    .collect();
-                record_count += recs.len();
-                debug!("Found {} records in file {}.", recs.len(), filename.path().display());
-            },
-            Err(e) => {
-                error!("Could not open file. {}", e);
-            }
-        }
-    }
-
-    record_count
-}
+pub type ParsingResult = Result<Box<ELBRecord>, ParsingErrors>;
 
 #[derive(Debug)]
 pub struct ParsingErrors {
-    record: String,
-    errors: Vec<ELBRecordParsingError>,
+    pub record: String,
+    pub errors: Vec<ELBRecordParsingError>,
 }
 
 #[derive(Debug, PartialEq)]
-enum ELBRecordParsingError {
+pub enum ELBRecordParsingError {
     MalformedRecord,
     ParsingError { field_id: ELBRecordField, description: String },
     LineReadError
@@ -112,6 +69,60 @@ impl Error for ELBRecordParsingError {
     fn cause(&self) -> Option<&Error> {
         Some(self)
     }
+}
+
+pub fn file_list(dir: &Path, filenames: &mut Vec<DirEntry>) -> Result<usize, walkdir::Error> {
+    for entry in WalkDir::new(dir).min_depth(1) {
+        match entry {
+            Err(err) => return Err(err),
+            Ok(entry) => filenames.push(entry),
+        }
+    }
+    Ok(filenames.len())
+}
+
+pub fn process_files<H>(filenames: &[DirEntry], record_handler: &mut H) -> usize
+    where H: FnMut(ParsingResult) -> () {
+
+    let mut total_record_count = 0;
+    for filename in filenames {
+        debug!("Processing file {}.", filename.path().display());
+        match File::open(filename.path()) {
+            Ok(file) => {
+                let file_record_count = handle_file(file, record_handler);
+                debug!("Found {} records in file {}.", file_record_count, filename.path().display());
+                total_record_count += file_record_count;
+            },
+
+            Err(e) => {
+                error!("Could not open file. {}", e);
+            }
+        }
+    }
+
+    total_record_count
+}
+
+fn handle_file<H>(file: File, record_handler: &mut H) -> usize
+    where H: FnMut(ParsingResult) -> () {
+    let mut file_record_count = 0;
+    for possible_record in BufReader::new(&file).lines() {
+        file_record_count += 1;
+        match possible_record {
+            Ok(record) => record_handler(parse_record(record)),
+
+            Err(_) => {
+                record_handler(
+                    Err(ParsingErrors {
+                        record: "".to_owned(),
+                        errors: vec![ELBRecordParsingError::LineReadError]
+                    })
+                )
+            }
+        }
+    };
+
+    file_record_count
 }
 
 //DON'T USE THIS IN YOUR CODE!!!
@@ -169,7 +180,7 @@ impl Display for ELBRecordField {
 }
 
 const ELB_RECORD_FIELD_COUNT: usize = 14;
-pub fn parse_record(record: String) -> Result<Box<ELBRecord>, ParsingErrors> {
+fn parse_record(record: String) -> ParsingResult {
     let mut errors: Vec<ELBRecordParsingError> = Vec::new();
 
     {
