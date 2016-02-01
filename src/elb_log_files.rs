@@ -29,7 +29,10 @@ pub struct ELBRecord {
     pub sent_bytes: u64,
     pub request_method: String,
     pub request_url: String,
-    pub request_http_version: String
+    pub request_http_version: String,
+    pub user_agent: String,
+    pub ssl_cipher: String,
+    pub ssl_protocol: String
 }
 
 pub type ParsingResult = Result<Box<ELBRecord>, ParsingErrors>;
@@ -147,7 +150,10 @@ pub enum ELBRecordField {
     SentBytes,
     RequestMethod,
     RequestURL,
-    RequestHTTPVersion
+    RequestHTTPVersion,
+    UserAgent,
+    SSLCipher,
+    SSLProtocol
 }
 
 impl<'a> Index<ELBRecordField> for Vec<&'a str> {
@@ -174,12 +180,18 @@ impl Display for ELBRecordField {
             ELBRecordField::SentBytes => write!(f, "sent bytes"),
             ELBRecordField::RequestMethod => write!(f, "request method"),
             ELBRecordField::RequestURL => write!(f, "request URL"),
-            ELBRecordField::RequestHTTPVersion => write!(f, "request HTTP version")
+            ELBRecordField::RequestHTTPVersion => write!(f, "request HTTP version"),
+            ELBRecordField::UserAgent => write!(f, "user agent"),
+            ELBRecordField::SSLCipher => write!(f, "SSL cipher"),
+            ELBRecordField::SSLProtocol => write!(f, "SSL protocol")
         }
     }
 }
 
-const ELB_RECORD_FIELD_COUNT: usize = 14;
+//For some reason AWS doesn't version their log file format so these version numbers where
+//selected by me to bring some sanity to this.
+const ELB_RECORD_V1_FIELD_COUNT: usize = 14;
+const ELB_RECORD_V2_FIELD_COUNT: usize = 17;
 fn parse_record(record: String) -> ParsingResult {
     let mut errors: Vec<ELBRecordParsingError> = Vec::new();
 
@@ -189,7 +201,7 @@ fn parse_record(record: String) -> ParsingResult {
         //Scoping this section of code seems more readable than creating a separate function
         //just to mitigate the borrow.
         let split_line: Vec<&str> = record.split(' ').collect();
-        if split_line.len() != ELB_RECORD_FIELD_COUNT {
+        if split_line.len() != ELB_RECORD_V1_FIELD_COUNT && split_line.len() != ELB_RECORD_V2_FIELD_COUNT {
             errors.push(ELBRecordParsingError::MalformedRecord);
             None
         } else {
@@ -203,6 +215,15 @@ fn parse_record(record: String) -> ParsingResult {
             let be_sc = split_line.parse_property(ELBRecordField::BackendStatusCode, &mut errors);
             let bytes_received = split_line.parse_property(ELBRecordField::ReceivedBytes, &mut errors);
             let bytes_sent = split_line.parse_property(ELBRecordField::SentBytes, &mut errors);
+            let mut user_agent = "-";
+            let mut ssl_cipher = "-";
+            let mut ssl_protocol = "-";
+
+            if split_line.len() == ELB_RECORD_V2_FIELD_COUNT {
+                user_agent = split_line[ELBRecordField::UserAgent].trim_matches('"');
+                ssl_cipher = &split_line[ELBRecordField::SSLCipher];
+                ssl_protocol = &split_line[ELBRecordField::SSLProtocol];
+            }
 
             if errors.is_empty() {
                 //If errors is empty it is more than likely parsing was successful and unwrap is safe.
@@ -221,7 +242,10 @@ fn parse_record(record: String) -> ParsingResult {
                         sent_bytes: bytes_sent.unwrap(),
                         request_method: split_line[ELBRecordField::RequestMethod].trim_matches('"').to_owned(),
                         request_url: split_line[ELBRecordField::RequestURL].to_owned(),
-                        request_http_version: split_line[ELBRecordField::RequestHTTPVersion].trim_matches('"').to_owned()
+                        request_http_version: split_line[ELBRecordField::RequestHTTPVersion].trim_matches('"').to_owned(),
+                        user_agent: user_agent.to_owned(),
+                        ssl_cipher: ssl_cipher.to_owned(),
+                        ssl_protocol: ssl_protocol.to_owned()
                     }
                 )
             } else {
@@ -281,10 +305,57 @@ mod tests {
     use super::ELBRecordParsingError;
     use super::ELBRecordField;
 
-    const TEST_RECORD: &'static str = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
+    const V1_TEST_RECORD: &'static str = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
     172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 7582 \
     \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
     ";
+
+    const V2_TEST_RECORD: &'static str = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
+    172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 7582 \
+    \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\" \
+    \"some_user_agent\" some_ssl_cipher some_ssl_protocol";
+
+    #[test]
+	fn parse_record_returns_a_record_with_the_ssl_protocol_set_to_a_not_available_symbol_when_it_is_not_present() {
+        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
+
+		assert_eq!(elb_record.ssl_protocol, "-")
+	}
+
+    #[test]
+	fn parse_record_returns_a_record_with_the_ssl_protocol_when_it_is_present() {
+        let elb_record = parse_record(V2_TEST_RECORD.to_string()).unwrap();
+
+		assert_eq!(elb_record.ssl_protocol, "some_ssl_protocol")
+	}
+
+    #[test]
+	fn parse_record_returns_a_record_with_the_ssl_cipher_set_to_a_not_available_symbol_when_it_is_not_present() {
+        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
+
+		assert_eq!(elb_record.ssl_cipher, "-")
+	}
+
+    #[test]
+	fn parse_record_returns_a_record_with_the_ssl_cipher_when_it_is_present() {
+        let elb_record = parse_record(V2_TEST_RECORD.to_string()).unwrap();
+
+		assert_eq!(elb_record.ssl_cipher, "some_ssl_cipher")
+	}
+
+    #[test]
+	fn parse_record_returns_a_record_with_the_user_agent_set_to_a_not_available_symbol_when_it_is_not_present() {
+        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
+
+		assert_eq!(elb_record.user_agent, "-")
+	}
+
+    #[test]
+	fn parse_record_returns_a_record_with_the_user_agent_when_it_is_present() {
+        let elb_record = parse_record(V2_TEST_RECORD.to_string()).unwrap();
+
+		assert_eq!(elb_record.user_agent, "some_user_agent")
+	}
 
     #[test]
 	fn parse_record_returns_a_malformed_record_error_for_records_short_on_values() {
@@ -300,28 +371,28 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_request_http_version() {
-        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
 
 		assert_eq!(elb_record.request_http_version, "HTTP/1.1")
 	}
 
     #[test]
 	fn parse_record_returns_a_record_with_the_request_url() {
-        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
 
 		assert_eq!(elb_record.request_url, "http://some.domain.com:80/path0/path1?param0=p0&param1=p1")
 	}
 
     #[test]
 	fn parse_record_returns_a_record_with_the_request_method() {
-        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
 
 		assert_eq!(elb_record.request_method, "GET")
 	}
 
     #[test]
 	fn parse_record_returns_a_record_with_the_sent_bytes() {
-        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
 
 		assert_eq!(elb_record.sent_bytes, 7582)
 	}
@@ -343,7 +414,7 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_received_bytes() {
-        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
 
 		assert_eq!(elb_record.received_bytes, 0)
 	}
@@ -365,7 +436,7 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_backend_status_code() {
-        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
 
 		assert_eq!(elb_record.backend_status_code, 200)
 	}
@@ -387,7 +458,7 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_elb_status_code() {
-        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
 
 		assert_eq!(elb_record.elb_status_code, 200)
 	}
@@ -409,7 +480,7 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_response_processing_time() {
-        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
 
 		assert_eq!(elb_record.response_processing_time, 0.00003)
 	}
@@ -431,7 +502,7 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_backend_processing_time() {
-        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
 
 		assert_eq!(elb_record.backend_processing_time, 0.145507)
 	}
@@ -453,7 +524,7 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_request_processing_time() {
-        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
 
 		assert_eq!(elb_record.request_processing_time, 0.000039)
 	}
@@ -475,7 +546,7 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_backend_address() {
-        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
 
 		assert_eq!(elb_record.backend_address, "172.16.1.5:9000".parse().unwrap())
 	}
@@ -497,7 +568,7 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_client_address() {
-        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
 
 		assert_eq!(elb_record.client_address, "172.16.1.6:54814".parse().unwrap())
 	}
@@ -519,7 +590,7 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_timestamp() {
-        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
 
 		assert_eq!(format!("{:?}", elb_record.timestamp), "2015-08-15T23:43:05.302180Z")
 	}
@@ -541,7 +612,7 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_elb_name() {
-        let elb_record = parse_record(TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
 
 		assert_eq!(elb_record.elb_name, "elb-name")
 	}
