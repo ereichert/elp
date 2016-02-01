@@ -190,6 +190,7 @@ impl Display for ELBRecordField {
 
 //For some reason AWS doesn't version their log file format so these version numbers where
 //selected by me to bring some sanity to this.
+//If a new version comes out we'll refactor this into seperate parsers based on the field count.
 const ELB_RECORD_V1_FIELD_COUNT: usize = 14;
 const ELB_RECORD_V2_FIELD_COUNT: usize = 17;
 fn parse_record(record: String) -> ParsingResult {
