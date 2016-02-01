@@ -147,7 +147,10 @@ pub enum ELBRecordField {
     SentBytes,
     RequestMethod,
     RequestURL,
-    RequestHTTPVersion
+    RequestHTTPVersion,
+    UserAgent,
+    SSLCipher,
+    SSLProtocol
 }
 
 impl<'a> Index<ELBRecordField> for Vec<&'a str> {
@@ -174,7 +177,10 @@ impl Display for ELBRecordField {
             ELBRecordField::SentBytes => write!(f, "sent bytes"),
             ELBRecordField::RequestMethod => write!(f, "request method"),
             ELBRecordField::RequestURL => write!(f, "request URL"),
-            ELBRecordField::RequestHTTPVersion => write!(f, "request HTTP version")
+            ELBRecordField::RequestHTTPVersion => write!(f, "request HTTP version"),
+            ELBRecordField::UserAgent => write!(f, "user agent"),
+            ELBRecordField::SSLCipher => write!(f, "SSL cipher"),
+            ELBRecordField::SSLProtocol => write!(f, "SSL protocol")
         }
     }
 }
