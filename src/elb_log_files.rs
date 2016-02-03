@@ -14,6 +14,12 @@ use std::fmt::{Formatter, Display};
 use std::fmt;
 use std::ops::Index;
 
+//For some reason AWS doesn't version their log file format so these version numbers where
+//selected by me to bring some sanity to this.
+//If a new version comes out we'll refactor this into seperate parsers based on the field count.
+const ELB_RECORD_V1_FIELD_COUNT: usize = 14;
+const ELB_RECORD_V2_FIELD_COUNT: usize = 17;
+
 #[derive(Debug)]
 pub struct ELBRecord {
     pub timestamp: DateTime<UTC>,
@@ -128,6 +134,188 @@ fn handle_file<H>(file: File, record_handler: &mut H) -> usize
     file_record_count
 }
 
+fn parse_record(record: String) -> ParsingResult {
+    let mut errors: Vec<ELBRecordParsingError> = Vec::with_capacity(ELB_RECORD_V2_FIELD_COUNT);
+
+    {
+        //record is borrowed by split_record which means ownership of
+        //record cannot be transferred to ParsingErrors until the borrow is complete.
+        //Scoping this section of code seems more readable than creating a separate function
+        //just to mitigate the borrow.
+        let split_record: Vec<&str> = record.split_record();
+        if split_record.len() != ELB_RECORD_V1_FIELD_COUNT && split_record.len() != ELB_RECORD_V2_FIELD_COUNT {
+            errors.push(ELBRecordParsingError::MalformedRecord);
+            None
+        } else {
+            let ts = split_record.parse_property(ELBRecordField::Timestamp, &mut errors);
+            let clnt_addr = split_record.parse_property(ELBRecordField::ClientAddress, &mut errors);
+            let be_addr = split_record.parse_property(ELBRecordField::BackendAddress, &mut errors);
+            let req_proc_time = split_record.parse_property(ELBRecordField::RequestProcessingTime, &mut errors);
+            let be_proc_time = split_record.parse_property(ELBRecordField::BackendProcessingTime, &mut errors);
+            let res_proc_time = split_record.parse_property(ELBRecordField::ResponseProcessingTime, &mut errors);
+            let elb_sc = split_record.parse_property(ELBRecordField::ELBStatusCode, &mut errors);
+            let be_sc = split_record.parse_property(ELBRecordField::BackendStatusCode, &mut errors);
+            let bytes_received = split_record.parse_property(ELBRecordField::ReceivedBytes, &mut errors);
+            let bytes_sent = split_record.parse_property(ELBRecordField::SentBytes, &mut errors);
+            let mut user_agent = "-";
+            let mut ssl_cipher = "-";
+            let mut ssl_protocol = "-";
+
+            if split_record.len() == ELB_RECORD_V2_FIELD_COUNT {
+                user_agent = split_record[ELBRecordField::UserAgent].trim_matches('"');
+                ssl_cipher = &split_record[ELBRecordField::SSLCipher];
+                ssl_protocol = &split_record[ELBRecordField::SSLProtocol];
+            }
+
+            if errors.is_empty() {
+                //If errors is empty it is more than likely parsing was successful and unwrap is safe.
+                Some(
+                    ELBRecord {
+                        timestamp: ts.unwrap(),
+                        elb_name: split_record[ELBRecordField::ELBName].to_owned(),
+                        client_address: clnt_addr.unwrap(),
+                        backend_address: be_addr.unwrap(),
+                        request_processing_time: req_proc_time.unwrap(),
+                        backend_processing_time: be_proc_time.unwrap(),
+                        response_processing_time: res_proc_time.unwrap(),
+                        elb_status_code: elb_sc.unwrap(),
+                        backend_status_code: be_sc.unwrap(),
+                        received_bytes: bytes_received.unwrap(),
+                        sent_bytes: bytes_sent.unwrap(),
+                        request_method: split_record[ELBRecordField::RequestMethod].trim_matches('"').to_owned(),
+                        request_url: split_record[ELBRecordField::RequestURL].to_owned(),
+                        request_http_version: split_record[ELBRecordField::RequestHTTPVersion].trim_matches('"').to_owned(),
+                        user_agent: user_agent.to_owned(),
+                        ssl_cipher: ssl_cipher.to_owned(),
+                        ssl_protocol: ssl_protocol.to_owned()
+                    }
+                )
+            } else {
+                None
+            }
+        }
+    }.map( |elb_rec|
+        Ok(Box::new(elb_rec))
+    ).unwrap_or_else( ||
+        Err(ParsingErrors {
+            record: record,
+            errors: errors
+        })
+    )
+}
+
+trait RecordSplitter {
+    fn split_record(&self) -> Vec<&str>;
+}
+
+impl RecordSplitter for String {
+
+    fn split_record(&self) -> Vec<&str> {
+        let mut split_record: Vec<&str> = Vec::with_capacity(ELB_RECORD_V2_FIELD_COUNT);
+        let mut start_idx = 0;
+        let mut parsing_context = RecordSplitterState::new();
+        for (current_idx, next_char) in self.trim_left().char_indices() {
+            if current_idx == (self.len() - 1) {
+                // The end of the record has been reached. Push the rest of the chars into the vec.
+                split_record.push(&self[start_idx..current_idx + 1]);
+            } else if parsing_context.skip_next_n_chars > 0 {
+                parsing_context.skip_next_n_chars -= 1;
+                start_idx += 1;
+            } else if next_char == parsing_context.end_delimiter {
+                split_record.push(&self[start_idx..current_idx]);
+                start_idx = current_idx + 1;
+                parsing_context.next();
+            }
+        }
+        debug!("{:?}", parsing_context);
+        debug!("{:?}", split_record);
+        split_record
+    }
+}
+
+#[derive(Debug)]
+struct RecordSplitterState {
+    end_delimiter: char,
+    current_field: ELBRecordField,
+    next_field: ELBRecordField,
+    skip_next_n_chars: usize
+}
+
+const SPACE: char = ' ';
+const DOUBLE_QUOTE: char = '"';
+impl RecordSplitterState {
+
+    fn new() -> RecordSplitterState {
+        RecordSplitterState {
+            end_delimiter: SPACE,
+            //current_field makes debugging a little easier.
+            current_field: ELBRecordField::Timestamp,
+            next_field: ELBRecordField::ELBName,
+            skip_next_n_chars: 0
+        }
+    }
+
+    fn next(&mut self) {
+        self.current_field = self.next_field.clone();
+        match self.current_field {
+            ELBRecordField::Timestamp => self.next_field = ELBRecordField::ELBName,
+
+            ELBRecordField::ELBName => self.next_field = ELBRecordField::ClientAddress,
+
+            ELBRecordField::ClientAddress => self.next_field = ELBRecordField::BackendAddress,
+
+            ELBRecordField::BackendAddress => self.next_field = ELBRecordField::RequestProcessingTime,
+
+            ELBRecordField::RequestProcessingTime => self.next_field = ELBRecordField::BackendProcessingTime,
+
+            ELBRecordField::BackendProcessingTime => self.next_field = ELBRecordField::ResponseProcessingTime,
+
+            ELBRecordField::ResponseProcessingTime => self.next_field = ELBRecordField::ELBStatusCode,
+
+            ELBRecordField::ELBStatusCode => self.next_field = ELBRecordField::BackendStatusCode,
+
+            ELBRecordField::BackendStatusCode => self.next_field = ELBRecordField::ReceivedBytes,
+
+            ELBRecordField::ReceivedBytes => self.next_field = ELBRecordField::SentBytes,
+
+            ELBRecordField::SentBytes => self.next_field = ELBRecordField::RequestMethod,
+
+            ELBRecordField::RequestMethod => {
+                self.end_delimiter = SPACE;
+                self.next_field = ELBRecordField::RequestURL;
+                self.skip_next_n_chars = 1;
+            },
+
+            ELBRecordField::RequestURL => {
+                self.end_delimiter = SPACE;
+                self.next_field = ELBRecordField::RequestHTTPVersion;
+            },
+
+            ELBRecordField::RequestHTTPVersion => {
+                self.end_delimiter = DOUBLE_QUOTE;
+                self.next_field = ELBRecordField::UserAgent;
+            },
+
+            ELBRecordField::UserAgent => {
+                self.end_delimiter = DOUBLE_QUOTE;
+                self.next_field = ELBRecordField::SSLCipher;
+                self.skip_next_n_chars = 2;
+            },
+
+            ELBRecordField::SSLCipher => {
+                self.end_delimiter = SPACE;
+                self.next_field = ELBRecordField::SSLProtocol;
+                self.skip_next_n_chars = 1;
+            },
+
+            ELBRecordField::SSLProtocol => {
+                self.end_delimiter = SPACE;
+                self.next_field = ELBRecordField::RequestHTTPVersion;
+            },
+        }
+    }
+}
+
 //DON'T USE THIS IN YOUR CODE!!!
 //This is really an implementation detail and shouldn't be exposed as part of the public API.
 //Unfortunately it must be made public in order to implement the Index trait.
@@ -186,201 +374,6 @@ impl Display for ELBRecordField {
             ELBRecordField::SSLProtocol => write!(f, "SSL protocol")
         }
     }
-}
-
-#[derive(Debug)]
-struct ParsingContext {
-    start_delimiter: char,
-    end_delimiter: char,
-    current_field: ELBRecordField,
-    next_field: ELBRecordField,
-    start_delimiter_found: bool,
-    skip_next_char: bool
-}
-
-const SPACE: char = ' ';
-const DOUBLE_QUOTE: char = '"';
-impl ParsingContext {
-
-    fn new() -> ParsingContext {
-        ParsingContext {
-            start_delimiter: SPACE,
-            end_delimiter: SPACE,
-            //current_field makes debugging a little easier.
-            current_field: ELBRecordField::Timestamp,
-            next_field: ELBRecordField::ELBName,
-            start_delimiter_found: true,
-            skip_next_char: false
-        }
-    }
-
-    fn next(&mut self) {
-        self.current_field = self.next_field.clone();
-        match self.current_field {
-            ELBRecordField::Timestamp => self.next_field = ELBRecordField::ELBName,
-
-            ELBRecordField::ELBName => self.next_field = ELBRecordField::ClientAddress,
-
-            ELBRecordField::ClientAddress => self.next_field = ELBRecordField::BackendAddress,
-
-            ELBRecordField::BackendAddress => self.next_field = ELBRecordField::RequestProcessingTime,
-
-            ELBRecordField::RequestProcessingTime => self.next_field = ELBRecordField::BackendProcessingTime,
-
-            ELBRecordField::BackendProcessingTime => self.next_field = ELBRecordField::ResponseProcessingTime,
-
-            ELBRecordField::ResponseProcessingTime => self.next_field = ELBRecordField::ELBStatusCode,
-
-            ELBRecordField::ELBStatusCode => self.next_field = ELBRecordField::BackendStatusCode,
-
-            ELBRecordField::BackendStatusCode => self.next_field = ELBRecordField::ReceivedBytes,
-
-            ELBRecordField::ReceivedBytes => self.next_field = ELBRecordField::SentBytes,
-
-            ELBRecordField::SentBytes => self.next_field = ELBRecordField::RequestMethod,
-
-            ELBRecordField::RequestMethod => {
-                self.start_delimiter = DOUBLE_QUOTE;
-                self.end_delimiter = SPACE;
-                self.next_field = ELBRecordField::RequestURL;
-                self.start_delimiter_found = false;
-            },
-
-            ELBRecordField::RequestURL => {
-                self.start_delimiter = SPACE;
-                self.end_delimiter = SPACE;
-                self.next_field = ELBRecordField::RequestHTTPVersion;
-                self.start_delimiter_found = true;
-            },
-
-            ELBRecordField::RequestHTTPVersion => {
-                self.start_delimiter = SPACE;
-                self.end_delimiter = DOUBLE_QUOTE;
-                self.next_field = ELBRecordField::UserAgent;
-                self.start_delimiter_found = true;
-            },
-
-            ELBRecordField::UserAgent => {
-                self.start_delimiter = DOUBLE_QUOTE;
-                self.end_delimiter = DOUBLE_QUOTE;
-                self.next_field = ELBRecordField::SSLCipher;
-                self.start_delimiter_found = false;
-            },
-
-            ELBRecordField::SSLCipher => {
-                self.start_delimiter = SPACE;
-                self.end_delimiter = SPACE;
-                self.next_field = ELBRecordField::SSLProtocol;
-                self.start_delimiter_found = true;
-                self.skip_next_char = true;
-            },
-
-            ELBRecordField::SSLProtocol => {
-                self.start_delimiter = SPACE;
-                self.end_delimiter = SPACE;
-                self.next_field = ELBRecordField::RequestHTTPVersion;
-                self.start_delimiter_found = true;
-            },
-        }
-    }
-}
-
-
-//For some reason AWS doesn't version their log file format so these version numbers where
-//selected by me to bring some sanity to this.
-//If a new version comes out we'll refactor this into seperate parsers based on the field count.
-const ELB_RECORD_V1_FIELD_COUNT: usize = 14;
-const ELB_RECORD_V2_FIELD_COUNT: usize = 17;
-const INITIAL_VEC_CAPACITY: usize = 20;
-fn parse_record(record: String) -> ParsingResult {
-    let mut errors: Vec<ELBRecordParsingError> = Vec::with_capacity(INITIAL_VEC_CAPACITY);
-
-    {
-        let mut split_line: Vec<&str> = Vec::with_capacity(INITIAL_VEC_CAPACITY);
-        let mut start_idx = 0;
-        let mut parsing_context = ParsingContext::new();
-        //record is borrowed by the trim_left and char_indices methods which means ownership of
-        //record cannot be transferred to ParsingErrors until the borrow is complete.
-        //Scoping this section of code seems more readable than creating a separate function
-        //just to mitigate the borrow.
-
-        //TODO move this into a function of the ParsingContext and get rid of the borrow problem
-        for (current_idx, next_char) in record.trim_left().char_indices() {
-            if current_idx == (record.len() - 1) {
-                split_line.push(&record[start_idx..current_idx + 1]);
-            } else if parsing_context.skip_next_char {
-                parsing_context.skip_next_char = false;  //TODO make this a number that counts down to 0
-                start_idx += 1;
-            } else if parsing_context.start_delimiter_found && next_char == parsing_context.end_delimiter {
-                let field = &record[start_idx..current_idx];
-                split_line.push(field);
-                start_idx = current_idx + 1;
-                parsing_context.next();
-            } else if next_char == parsing_context.start_delimiter {
-                start_idx = current_idx + 1;
-                parsing_context.start_delimiter_found = true;
-            }
-        }
-
-        if split_line.len() != ELB_RECORD_V1_FIELD_COUNT && split_line.len() != ELB_RECORD_V2_FIELD_COUNT {
-            errors.push(ELBRecordParsingError::MalformedRecord);
-            None
-        } else {
-            let ts = split_line.parse_property(ELBRecordField::Timestamp, &mut errors);
-            let clnt_addr = split_line.parse_property(ELBRecordField::ClientAddress, &mut errors);
-            let be_addr = split_line.parse_property(ELBRecordField::BackendAddress, &mut errors);
-            let req_proc_time = split_line.parse_property(ELBRecordField::RequestProcessingTime, &mut errors);
-            let be_proc_time = split_line.parse_property(ELBRecordField::BackendProcessingTime, &mut errors);
-            let res_proc_time = split_line.parse_property(ELBRecordField::ResponseProcessingTime, &mut errors);
-            let elb_sc = split_line.parse_property(ELBRecordField::ELBStatusCode, &mut errors);
-            let be_sc = split_line.parse_property(ELBRecordField::BackendStatusCode, &mut errors);
-            let bytes_received = split_line.parse_property(ELBRecordField::ReceivedBytes, &mut errors);
-            let bytes_sent = split_line.parse_property(ELBRecordField::SentBytes, &mut errors);
-            let mut user_agent = "-";
-            let mut ssl_cipher = "-";
-            let mut ssl_protocol = "-";
-
-            if split_line.len() == ELB_RECORD_V2_FIELD_COUNT {
-                user_agent = split_line[ELBRecordField::UserAgent].trim_matches('"');
-                ssl_cipher = &split_line[ELBRecordField::SSLCipher];
-                ssl_protocol = &split_line[ELBRecordField::SSLProtocol];
-            }
-
-            if errors.is_empty() {
-                //If errors is empty it is more than likely parsing was successful and unwrap is safe.
-                Some(
-                    ELBRecord {
-                        timestamp: ts.unwrap(),
-                        elb_name: split_line[ELBRecordField::ELBName].to_owned(),
-                        client_address: clnt_addr.unwrap(),
-                        backend_address: be_addr.unwrap(),
-                        request_processing_time: req_proc_time.unwrap(),
-                        backend_processing_time: be_proc_time.unwrap(),
-                        response_processing_time: res_proc_time.unwrap(),
-                        elb_status_code: elb_sc.unwrap(),
-                        backend_status_code: be_sc.unwrap(),
-                        received_bytes: bytes_received.unwrap(),
-                        sent_bytes: bytes_sent.unwrap(),
-                        request_method: split_line[ELBRecordField::RequestMethod].trim_matches('"').to_owned(),
-                        request_url: split_line[ELBRecordField::RequestURL].to_owned(),
-                        request_http_version: split_line[ELBRecordField::RequestHTTPVersion].trim_matches('"').to_owned(),
-                        user_agent: user_agent.to_owned(),
-                        ssl_cipher: ssl_cipher.to_owned(),
-                        ssl_protocol: ssl_protocol.to_owned()
-                    }
-                )
-            } else {
-                None
-            }
-        }
-    }.map( |elb_rec|
-        Ok(Box::new(elb_rec))
-    ).unwrap_or_else( ||
-        Err(ParsingErrors {
-            record: record,
-            errors: errors
-        })
-    )
 }
 
 trait ELBRecordFieldParser {
