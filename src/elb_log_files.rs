@@ -212,18 +212,17 @@ impl RecordSplitter for String {
 
     fn split_record(&self) -> Vec<&str> {
         let mut split_record: Vec<&str> = Vec::with_capacity(ELB_RECORD_V2_FIELD_COUNT);
-        let mut start_idx = 0;
         let mut parsing_context = RecordSplitterState::new();
         for (current_idx, next_char) in self.trim_left().char_indices() {
             if current_idx == (self.len() - 1) {
                 // The end of the record has been reached. Push the rest of the chars into the vec.
-                split_record.push(&self[start_idx..current_idx + 1]);
+                split_record.push(&self[parsing_context.start_of_field_index..current_idx + 1]);
             } else if parsing_context.skip_next_n_chars > 0 {
                 parsing_context.skip_next_n_chars -= 1;
-                start_idx += 1;
+                parsing_context.start_of_field_index += 1;
             } else if next_char == parsing_context.end_delimiter {
-                split_record.push(&self[start_idx..current_idx]);
-                start_idx = current_idx + 1;
+                split_record.push(&self[parsing_context.start_of_field_index..current_idx]);
+                parsing_context.start_of_field_index = current_idx + 1;
                 parsing_context.next();
             }
         }
@@ -238,7 +237,8 @@ struct RecordSplitterState {
     end_delimiter: char,
     current_field: ELBRecordField,
     next_field: ELBRecordField,
-    skip_next_n_chars: usize
+    skip_next_n_chars: usize,
+    start_of_field_index: usize
 }
 
 const SPACE: char = ' ';
@@ -251,7 +251,8 @@ impl RecordSplitterState {
             //current_field makes debugging a little easier.
             current_field: ELBRecordField::Timestamp,
             next_field: ELBRecordField::ELBName,
-            skip_next_n_chars: 0
+            skip_next_n_chars: 0,
+            start_of_field_index: 0
         }
     }
 
