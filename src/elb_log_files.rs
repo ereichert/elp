@@ -188,20 +188,140 @@ impl Display for ELBRecordField {
     }
 }
 
+#[derive(Debug)]
+struct ParsingContext {
+    start_delimiter: char,
+    end_delimiter: char,
+    current_field: ELBRecordField,
+    next_field: ELBRecordField,
+    start_delimiter_found: bool,
+    skip_next_char: bool
+}
+
+const SPACE: char = ' ';
+const DOUBLE_QUOTE: char = '"';
+impl ParsingContext {
+
+    fn new() -> ParsingContext {
+        ParsingContext {
+            start_delimiter: SPACE,
+            end_delimiter: SPACE,
+            //current_field makes debugging a little easier.
+            current_field: ELBRecordField::Timestamp,
+            next_field: ELBRecordField::ELBName,
+            start_delimiter_found: true,
+            skip_next_char: false
+        }
+    }
+
+    fn next(&mut self) {
+        self.current_field = self.next_field.clone();
+        match self.current_field {
+            ELBRecordField::Timestamp => self.next_field = ELBRecordField::ELBName,
+
+            ELBRecordField::ELBName => self.next_field = ELBRecordField::ClientAddress,
+
+            ELBRecordField::ClientAddress => self.next_field = ELBRecordField::BackendAddress,
+
+            ELBRecordField::BackendAddress => self.next_field = ELBRecordField::RequestProcessingTime,
+
+            ELBRecordField::RequestProcessingTime => self.next_field = ELBRecordField::BackendProcessingTime,
+
+            ELBRecordField::BackendProcessingTime => self.next_field = ELBRecordField::ResponseProcessingTime,
+
+            ELBRecordField::ResponseProcessingTime => self.next_field = ELBRecordField::ELBStatusCode,
+
+            ELBRecordField::ELBStatusCode => self.next_field = ELBRecordField::BackendStatusCode,
+
+            ELBRecordField::BackendStatusCode => self.next_field = ELBRecordField::ReceivedBytes,
+
+            ELBRecordField::ReceivedBytes => self.next_field = ELBRecordField::SentBytes,
+
+            ELBRecordField::SentBytes => self.next_field = ELBRecordField::RequestMethod,
+
+            ELBRecordField::RequestMethod => {
+                self.start_delimiter = DOUBLE_QUOTE;
+                self.end_delimiter = SPACE;
+                self.next_field = ELBRecordField::RequestURL;
+                self.start_delimiter_found = false;
+            },
+
+            ELBRecordField::RequestURL => {
+                self.start_delimiter = SPACE;
+                self.end_delimiter = SPACE;
+                self.next_field = ELBRecordField::RequestHTTPVersion;
+                self.start_delimiter_found = true;
+            },
+
+            ELBRecordField::RequestHTTPVersion => {
+                self.start_delimiter = SPACE;
+                self.end_delimiter = DOUBLE_QUOTE;
+                self.next_field = ELBRecordField::UserAgent;
+                self.start_delimiter_found = true;
+            },
+
+            ELBRecordField::UserAgent => {
+                self.start_delimiter = DOUBLE_QUOTE;
+                self.end_delimiter = DOUBLE_QUOTE;
+                self.next_field = ELBRecordField::SSLCipher;
+                self.start_delimiter_found = false;
+            },
+
+            ELBRecordField::SSLCipher => {
+                self.start_delimiter = SPACE;
+                self.end_delimiter = SPACE;
+                self.next_field = ELBRecordField::SSLProtocol;
+                self.start_delimiter_found = true;
+                self.skip_next_char = true;
+            },
+
+            ELBRecordField::SSLProtocol => {
+                self.start_delimiter = SPACE;
+                self.end_delimiter = SPACE;
+                self.next_field = ELBRecordField::RequestHTTPVersion;
+                self.start_delimiter_found = true;
+            },
+        }
+    }
+}
+
+
 //For some reason AWS doesn't version their log file format so these version numbers where
 //selected by me to bring some sanity to this.
 //If a new version comes out we'll refactor this into seperate parsers based on the field count.
 const ELB_RECORD_V1_FIELD_COUNT: usize = 14;
 const ELB_RECORD_V2_FIELD_COUNT: usize = 17;
+const INITIAL_VEC_CAPACITY: usize = 20;
 fn parse_record(record: String) -> ParsingResult {
-    let mut errors: Vec<ELBRecordParsingError> = Vec::new();
+    let mut errors: Vec<ELBRecordParsingError> = Vec::with_capacity(INITIAL_VEC_CAPACITY);
 
     {
-        //record is borrowed by the split method which means ownership of record cannot be
-        //transferred to ParsingErrors until the borrow is complete.
+        let mut split_line: Vec<&str> = Vec::with_capacity(INITIAL_VEC_CAPACITY);
+        let mut start_idx = 0;
+        let mut parsing_context = ParsingContext::new();
+        //record is borrowed by the trim_left and char_indices methods which means ownership of
+        //record cannot be transferred to ParsingErrors until the borrow is complete.
         //Scoping this section of code seems more readable than creating a separate function
         //just to mitigate the borrow.
-        let split_line: Vec<&str> = record.split(' ').collect();
+
+        //TODO move this into a function of the ParsingContext and get rid of the borrow problem
+        for (current_idx, next_char) in record.trim_left().char_indices() {
+            if current_idx == (record.len() - 1) {
+                split_line.push(&record[start_idx..current_idx + 1]);
+            } else if parsing_context.skip_next_char {
+                parsing_context.skip_next_char = false;  //TODO make this a number that counts down to 0
+                start_idx += 1;
+            } else if parsing_context.start_delimiter_found && next_char == parsing_context.end_delimiter {
+                let field = &record[start_idx..current_idx];
+                split_line.push(field);
+                start_idx = current_idx + 1;
+                parsing_context.next();
+            } else if next_char == parsing_context.start_delimiter {
+                start_idx = current_idx + 1;
+                parsing_context.start_delimiter_found = true;
+            }
+        }
+
         if split_line.len() != ELB_RECORD_V1_FIELD_COUNT && split_line.len() != ELB_RECORD_V2_FIELD_COUNT {
             errors.push(ELBRecordParsingError::MalformedRecord);
             None
@@ -356,7 +476,7 @@ mod tests {
 	fn parse_record_returns_a_record_with_the_user_agent_when_it_is_present() {
         let elb_record = parse_record(V2_TEST_RECORD.to_string()).unwrap();
 
-		assert_eq!(elb_record.user_agent, "some_user_agent")
+		assert_eq!(elb_record.user_agent, "Mozilla/5.0 (cloud; like Mac OS X; en-us) AppleWebKit/537.36.0 (KHTML, like Gecko) Version/4.0.4 Mobile/7B334b Safari/537.36.0")
 	}
 
     #[test]
