@@ -129,18 +129,17 @@ aws-abacus
 
 Usage:
   aws-abacus <log-location>
-  aws-abacus (-d | --debug | -b | --benchmark) <log-location>
+  aws-abacus (-b | --benchmark) <log-location>
   aws-abacus (-h | --help)
 
 Options:
-  -h --help     Show this screen.
-  -d --debug    Turn on debug output
+  -h --help         Show this screen.
+  -b --benchmark    Turn on debug output
 ";
 
 #[derive(Debug, RustcDecodable)]
 struct Args {
     arg_log_location: String,
-    flag_debug: bool,
     flag_benchmark: bool,
 }
 
