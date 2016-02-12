@@ -147,16 +147,16 @@ fn parse_record(record: String) -> ParsingResult {
             errors.push(ELBRecordParsingError::MalformedRecord);
             None
         } else {
-            let ts = split_record.parse_property(ELBRecordField::Timestamp, &mut errors);
-            let clnt_addr = split_record.parse_property(ELBRecordField::ClientAddress, &mut errors);
-            let be_addr = split_record.parse_property(ELBRecordField::BackendAddress, &mut errors);
-            let req_proc_time = split_record.parse_property(ELBRecordField::RequestProcessingTime, &mut errors);
-            let be_proc_time = split_record.parse_property(ELBRecordField::BackendProcessingTime, &mut errors);
-            let res_proc_time = split_record.parse_property(ELBRecordField::ResponseProcessingTime, &mut errors);
-            let elb_sc = split_record.parse_property(ELBRecordField::ELBStatusCode, &mut errors);
-            let be_sc = split_record.parse_property(ELBRecordField::BackendStatusCode, &mut errors);
-            let bytes_received = split_record.parse_property(ELBRecordField::ReceivedBytes, &mut errors);
-            let bytes_sent = split_record.parse_property(ELBRecordField::SentBytes, &mut errors);
+            let ts = split_record.parse_field(ELBRecordField::Timestamp, &mut errors);
+            let clnt_addr = split_record.parse_field(ELBRecordField::ClientAddress, &mut errors);
+            let be_addr = split_record.parse_field(ELBRecordField::BackendAddress, &mut errors);
+            let req_proc_time = split_record.parse_field(ELBRecordField::RequestProcessingTime, &mut errors);
+            let be_proc_time = split_record.parse_field(ELBRecordField::BackendProcessingTime, &mut errors);
+            let res_proc_time = split_record.parse_field(ELBRecordField::ResponseProcessingTime, &mut errors);
+            let elb_sc = split_record.parse_field(ELBRecordField::ELBStatusCode, &mut errors);
+            let be_sc = split_record.parse_field(ELBRecordField::BackendStatusCode, &mut errors);
+            let bytes_received = split_record.parse_field(ELBRecordField::ReceivedBytes, &mut errors);
+            let bytes_sent = split_record.parse_field(ELBRecordField::SentBytes, &mut errors);
             let mut user_agent = "-";
             let mut ssl_cipher = "-";
             let mut ssl_protocol = "-";
@@ -378,7 +378,7 @@ impl Display for ELBRecordField {
 }
 
 trait ELBRecordFieldParser {
-    fn parse_property<T>(
+    fn parse_field<T>(
         &self,
         field_id: ELBRecordField,
         errors: &mut Vec<ELBRecordParsingError>
@@ -389,7 +389,7 @@ trait ELBRecordFieldParser {
 
 impl<'a> ELBRecordFieldParser for Vec<&'a str> {
 
-    fn parse_property<T>(
+    fn parse_field<T>(
         &self,
         field_id: ELBRecordField,
         errors: &mut Vec<ELBRecordParsingError>
