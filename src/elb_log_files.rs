@@ -53,7 +53,8 @@ pub struct ParsingErrors {
 pub enum ELBRecordParsingError {
     MalformedRecord,
     ParsingError { field_id: ELBRecordField, description: String },
-    LineReadError
+    LineReadError,
+    CouldNotOpenFile { path: String },
 }
 
 impl Display for ELBRecordParsingError {
@@ -62,6 +63,7 @@ impl Display for ELBRecordParsingError {
             ELBRecordParsingError::MalformedRecord => write!(f, "Record is malformed."),
             ELBRecordParsingError::ParsingError { ref field_id, ref description } => write!(f, "Parsing of field {} failed with the following error: {}.", field_id, description),
             ELBRecordParsingError::LineReadError => write!(f, "Unable to read a line."),
+            ELBRecordParsingError::CouldNotOpenFile { ref path } => write!(f, "Unable to open file {}.", path),
         }
     }
 }
@@ -72,6 +74,7 @@ impl Error for ELBRecordParsingError {
             ELBRecordParsingError::MalformedRecord => "malformed record",
             ELBRecordParsingError::ParsingError { .. } => "field parsing failed",
             ELBRecordParsingError::LineReadError => "failed to read line",
+            ELBRecordParsingError::CouldNotOpenFile { .. } => "failed to open file",
         }
     }
 
@@ -103,8 +106,13 @@ pub fn process_files<H>(filenames: &[DirEntry], record_handler: &mut H) -> usize
                 total_record_count += file_record_count;
             },
 
-            Err(e) => {
-                error!("Could not open file. {}", e);
+            Err(_) => {
+                record_handler(
+                    Err(ParsingErrors {
+                        record: "".to_owned(),
+                        errors: vec![ELBRecordParsingError::CouldNotOpenFile { path: format!("{}", filename.path().display()) }]
+                    })
+                )
             }
         }
     }
