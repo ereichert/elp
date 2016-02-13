@@ -20,6 +20,10 @@ use std::ops::Index;
 const ELB_RECORD_V1_FIELD_COUNT: usize = 14;
 const ELB_RECORD_V2_FIELD_COUNT: usize = 17;
 
+///The product of parsing a single AWS ELB log record.
+///
+///Outside of testing it is doubtful a user would have any reason to construct a ELBRecord
+///manually.
 #[derive(Debug)]
 pub struct ELBRecord {
     pub timestamp: DateTime<UTC>,
