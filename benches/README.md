@@ -1,5 +1,12 @@
 ### cargo bench runs
 
+02/12/2016 -
+
+Upgraded to Rust 1.7.0 nightly.
+Fully implemented algorithm.  Release candidate.
+
+test bench_parse_line ... bench:       2,392 ns/iter (+/- 329)
+
 02/01/2016 -
 
 Moved to_string() calls to to_owned where appropriate.
