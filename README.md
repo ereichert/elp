@@ -11,6 +11,8 @@ This project supports the [Rust Code of Conduct](https://www.rust-lang.org/condu
 
 ##How To
 
+There is a full example of ELP's use in a production environment [here](https://github.com/trafficland/counter).
+
 Add ELP as a dependency.  Add the following to your `Cargo.toml`:
 
 ```toml
