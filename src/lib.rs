@@ -16,16 +16,16 @@ use std::fmt::{Formatter, Display};
 use std::fmt;
 use std::ops::Index;
 
-//For some reason AWS doesn't version their log file format so these version numbers where
-//selected by me to bring some sanity to this.
-//If a new version comes out we'll refactor this into seperate parsers based on the field count.
+// For some reason AWS doesn't version their log file format so these version numbers where
+// selected by me to bring some sanity to this.
+// If a new version comes out we'll refactor this into seperate parsers based on the field count.
 const ELB_RECORD_V1_FIELD_COUNT: usize = 14;
 const ELB_RECORD_V2_FIELD_COUNT: usize = 17;
 
-///The product of parsing a single AWS ELB log record.
+/// The product of parsing a single AWS ELB log record.
 ///
-///Outside of testing it is doubtful a user would have any reason to construct a ELBRecord
-///manually.
+/// Outside of testing it is doubtful a user would have any reason to construct a ELBRecord
+/// manually.
 #[derive(Debug)]
 pub struct ELBRecord {
     pub timestamp: DateTime<UTC>,
@@ -47,19 +47,34 @@ pub struct ELBRecord {
     pub ssl_protocol: String
 }
 
+/// The result of an attempt to parse an ELB record.
 pub type ParsingResult = Result<Box<ELBRecord>, ParsingErrors>;
 
+/// The result of a failed attempt to parse an ELB record.
+///
+/// It is very possible that multiple fields of a record are not parsable.  An attempt is made to
+/// parse all of the fields of an ELB record.  An error is returned for each field that was not
+/// parsable to make it clear what parts of the record were faulty and allow the user to decide
+/// how to handle the failure.
 #[derive(Debug)]
 pub struct ParsingErrors {
+    /// The original record as it was read.
     pub record: String,
+    /// A collection of parsing errors, one for each field that could not be parsed.
     pub errors: Vec<ELBRecordParsingError>,
 }
 
+/// Specific parsing errors that are returned as part of the ParsingErrors::errors collection.
 #[derive(Debug, PartialEq)]
 pub enum ELBRecordParsingError {
+    /// Returned if the record does not have the correct number of fields.
     MalformedRecord,
-    ParsingError { field_id: ELBRecordField, description: String },
+    /// A failed attempt to parse a specific field of the ELB record.
+    ParsingError { field_name: ELBRecordField, description: String },
+    /// Returned if a line in an ELB file cannot be read.  Most likely the result of a bad file on
+    /// disk.
     LineReadError,
+    /// Returned if an ELB file cannot be opened.  Most likely the result of a bad file on disk.
     CouldNotOpenFile { path: String },
 }
 
@@ -67,7 +82,7 @@ impl Display for ELBRecordParsingError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match *self {
             ELBRecordParsingError::MalformedRecord => write!(f, "Record is malformed."),
-            ELBRecordParsingError::ParsingError { ref field_id, ref description } => write!(f, "Parsing of field {} failed with the following error: {}.", field_id, description),
+            ELBRecordParsingError::ParsingError { ref field_name, ref description } => write!(f, "Parsing of field {} failed with the following error: {}.", field_name, description),
             ELBRecordParsingError::LineReadError => write!(f, "Unable to read a line."),
             ELBRecordParsingError::CouldNotOpenFile { ref path } => write!(f, "Unable to open file {}.", path),
         }
@@ -89,6 +104,16 @@ impl Error for ELBRecordParsingError {
     }
 }
 
+/// A utility method for retrieving the paths of all of the ELB log files in a directory.
+///
+/// If the user uses the [AWS S3 sync tool](http://docs.aws.amazon.com/cli/latest/reference/s3/sync.html)
+/// to download their AWS ELB logs to a local disk they files will be in a very specific directory
+/// hierarchy.  This utility will read the paths of the files recursively and return the list to the user for
+/// for use with process_files method.
+///
+/// dir: The directory from which the paths of the ELB log files will be procured.
+///
+/// filenames: A Vec<DirEntry> to which the paths of the ELB log files will be written.
 pub fn file_list(dir: &Path, filenames: &mut Vec<DirEntry>) -> Result<usize, walkdir::Error> {
     for entry in WalkDir::new(dir).min_depth(1) {
         match entry {
@@ -99,6 +124,16 @@ pub fn file_list(dir: &Path, filenames: &mut Vec<DirEntry>) -> Result<usize, wal
     Ok(filenames.len())
 }
 
+/// Attempt to parse every ELB record in every file in filenames and pass the results to the
+/// record_handler.
+///
+/// Each file will be opened and each line, which should represent a ELB record, will be passed
+/// through the parser.
+///
+/// # Failures
+///
+/// All failures including file access, file read, and parsing failures are passed to the
+/// record_handler as a `ParsingErrors`.
 pub fn process_files<H>(filenames: &[DirEntry], record_handler: &mut H) -> usize
     where H: FnMut(ParsingResult) -> () {
 
@@ -331,13 +366,13 @@ impl RecordSplitterState {
     }
 }
 
-//DON'T USE THIS IN YOUR CODE!!!
-//This is really an implementation detail and shouldn't be exposed as part of the public API.
-//Unfortunately it must be made public in order to implement the Index trait.
-//I could use the newtype pattern but the newtype pattern forces another level of indirection
-//with no gain besides reducing the exposure a little. I hope that in the future we'll be able to
-//implement public methods without having to expose, what should be, private details.
-//This behaviour has been changed in 1.7.0 nightly.  This will be made private as soon as 1.7.0 is released.
+/// **DON'T USE THIS IN YOUR CODE!!!**
+/// This is really an implementation detail and shouldn't be exposed as part of the public API.
+/// Unfortunately it must be made public in order to implement the Index trait.
+/// I could use the newtype pattern but the newtype pattern forces another level of indirection
+/// with no gain besides reducing the exposure a little. I hope that in the future we'll be able to
+/// implement public methods without having to expose, what should be, private details.
+/// This behaviour has been changed in 1.7.0 nightly.  This will be made private as soon as 1.7.0 is released.
 #[derive(Debug, PartialEq, Clone)]
 pub enum ELBRecordField {
     Timestamp = 0,
@@ -394,7 +429,7 @@ impl Display for ELBRecordField {
 trait ELBRecordFieldParser {
     fn parse_field<T>(
         &self,
-        field_id: ELBRecordField,
+        field_name: ELBRecordField,
         errors: &mut Vec<ELBRecordParsingError>
     ) -> Option<T>
         where T: FromStr,
@@ -405,20 +440,20 @@ impl<'a> ELBRecordFieldParser for Vec<&'a str> {
 
     fn parse_field<T>(
         &self,
-        field_id: ELBRecordField,
+        field_name: ELBRecordField,
         errors: &mut Vec<ELBRecordParsingError>
     ) -> Option<T>
         where T: FromStr,
         T::Err: Error + 'static,
     {
-        let raw_prop = &self[field_id.clone()];
+        let raw_prop = &self[field_name.clone()];
         match raw_prop.parse::<T>() {
             Ok(parsed) => Some(parsed),
 
             Err(e) => {
                 errors.push(
                     ELBRecordParsingError::ParsingError {
-                        field_id: field_id,
+                        field_name: field_name,
                         description: e.description().to_owned(),
                     }
                 );
@@ -534,12 +569,12 @@ mod tests {
           \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
           ";
 
-          let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
-              ELBRecordParsingError::ParsingError { field_id, .. } => field_id,
+          let error_field_name = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+              ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
               _ => panic!(),
           };
 
-      assert_eq!(error_field_id, ELBRecordField::SentBytes)
+      assert_eq!(error_field_name, ELBRecordField::SentBytes)
     }
 
     #[test]
@@ -556,12 +591,12 @@ mod tests {
           \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
           ";
 
-          let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
-              ELBRecordParsingError::ParsingError { field_id, .. } => field_id,
+          let error_field_name = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+              ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
               _ => panic!(),
           };
 
-      assert_eq!(error_field_id, ELBRecordField::ReceivedBytes)
+      assert_eq!(error_field_name, ELBRecordField::ReceivedBytes)
     }
 
     #[test]
@@ -578,12 +613,12 @@ mod tests {
           \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
           ";
 
-          let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
-              ELBRecordParsingError::ParsingError { field_id, .. } => field_id,
+          let error_field_name = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+              ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
               _ => panic!(),
           };
 
-      assert_eq!(error_field_id, ELBRecordField::BackendStatusCode)
+      assert_eq!(error_field_name, ELBRecordField::BackendStatusCode)
     }
 
     #[test]
@@ -600,12 +635,12 @@ mod tests {
           \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
           ";
 
-          let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
-              ELBRecordParsingError::ParsingError { field_id, .. } => field_id,
+          let error_field_name = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+              ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
               _ => panic!(),
           };
 
-      assert_eq!(error_field_id, ELBRecordField::ELBStatusCode)
+      assert_eq!(error_field_name, ELBRecordField::ELBStatusCode)
     }
 
     #[test]
@@ -622,12 +657,12 @@ mod tests {
           \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
           ";
 
-          let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
-              ELBRecordParsingError::ParsingError { field_id, .. } => field_id,
+          let error_field_name = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+              ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
               _ => panic!(),
           };
 
-      assert_eq!(error_field_id, ELBRecordField::ResponseProcessingTime)
+      assert_eq!(error_field_name, ELBRecordField::ResponseProcessingTime)
     }
 
     #[test]
@@ -644,12 +679,12 @@ mod tests {
           \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
           ";
 
-          let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
-              ELBRecordParsingError::ParsingError { field_id, .. } => field_id,
+          let error_field_name = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+              ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
               _ => panic!(),
           };
 
-      assert_eq!(error_field_id, ELBRecordField::BackendProcessingTime)
+      assert_eq!(error_field_name, ELBRecordField::BackendProcessingTime)
     }
 
     #[test]
@@ -666,12 +701,12 @@ mod tests {
           \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
           ";
 
-          let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
-              ELBRecordParsingError::ParsingError { field_id, .. } => field_id,
+          let error_field_name = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+              ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
               _ => panic!(),
           };
 
-      assert_eq!(error_field_id, ELBRecordField::RequestProcessingTime)
+      assert_eq!(error_field_name, ELBRecordField::RequestProcessingTime)
     }
 
     #[test]
@@ -688,12 +723,12 @@ mod tests {
         \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
         ";
 
-        let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
-            ELBRecordParsingError::ParsingError { field_id, .. } => field_id,
+        let error_field_name = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+            ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
             _ => panic!(),
         };
 
-		assert_eq!(error_field_id, ELBRecordField::BackendAddress)
+		assert_eq!(error_field_name, ELBRecordField::BackendAddress)
 	}
 
     #[test]
@@ -710,12 +745,12 @@ mod tests {
         \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
         ";
 
-        let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
-            ELBRecordParsingError::ParsingError { field_id, .. } => field_id,
+        let error_field_name = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+            ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
             _ => panic!(),
         };
 
-		assert_eq!(error_field_id, ELBRecordField::ClientAddress)
+		assert_eq!(error_field_name, ELBRecordField::ClientAddress)
 	}
 
     #[test]
@@ -732,12 +767,12 @@ mod tests {
         \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
         ";
 
-        let error_field_id = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
-            ELBRecordParsingError::ParsingError { field_id, .. } => field_id,
+        let error_field_name = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+            ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
             _ => panic!(),
         };
 
-		assert_eq!(error_field_id, ELBRecordField::Timestamp)
+		assert_eq!(error_field_name, ELBRecordField::Timestamp)
 	}
 
     #[test]
