@@ -1,6 +1,6 @@
 [package]
-name = "aws-elb-abacus"
-version = "0.1.0"
+name = "elp"
+version = "1.0.0"
 authors = ["Eric D. Reichert <eric@reichertconsulting.com>"]
 
 [dependencies]
