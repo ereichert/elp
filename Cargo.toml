@@ -5,5 +5,5 @@ authors = ["Eric D. Reichert <eric@reichertconsulting.com>"]
 
 [dependencies]
 walkdir = "0.1.5"
-chrono = "0.2.17"
+chrono = "0.2.19"
 log = "0.3.5"
