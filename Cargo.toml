@@ -1,7 +1,9 @@
 [package]
 name = "elp"
-version = "1.0.0"
+version = "0.99.0"
 authors = ["Eric D. Reichert <eric@reichertconsulting.com>"]
+description = "AWS ELB Access Log Parser"
+
 
 [dependencies]
 walkdir = "0.1.5"
