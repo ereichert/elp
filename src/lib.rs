@@ -16,16 +16,12 @@ use std::fmt::{Formatter, Display};
 use std::fmt;
 use std::ops::Index;
 
-// For some reason AWS doesn't version their log file format so these version numbers where
-// selected by me to bring some sanity to this.
-// If a new version comes out we'll refactor this into seperate parsers based on the field count.
+// AWS doesn't version their log file format so these version numbers were
+// selected by me to bring some sanity to the various formats.
 const ELB_RECORD_V1_FIELD_COUNT: usize = 14;
 const ELB_RECORD_V2_FIELD_COUNT: usize = 17;
 
 /// The product of parsing a single AWS ELB log record.
-///
-/// Outside of testing it is doubtful a user would have any reason to construct a ELBRecord
-/// manually.
 #[derive(Debug)]
 pub struct ELBRecord {
     pub timestamp: DateTime<UTC>,
@@ -54,17 +50,18 @@ pub type ParsingResult = Result<Box<ELBRecord>, ParsingErrors>;
 ///
 /// It is very possible that multiple fields of a record are not parsable.  An attempt is made to
 /// parse all of the fields of an ELB record.  An error is returned for each field that was not
-/// parsable to make it clear what parts of the record were faulty and allow the user to decide
+/// parsable to make it clear what fields of the record were faulty and allow the user to decide
 /// how to handle the failure.
 #[derive(Debug)]
 pub struct ParsingErrors {
-    /// The original record as it was read.
+    /// The raw record.
     pub record: String,
-    /// A collection of parsing errors, one for each field that could not be parsed.
+    /// A collection of parsing errors such as fields that could not be parsed or a failure to
+    /// open an ELB log file.
     pub errors: Vec<ELBRecordParsingError>,
 }
 
-/// Specific parsing errors that are returned as part of the ParsingErrors::errors collection.
+/// Specific parsing errors that are returned as part of the `ParsingErrors::errors` collection.
 #[derive(Debug, PartialEq)]
 pub enum ELBRecordParsingError {
     /// Returned if the record does not have the correct number of fields.
@@ -104,12 +101,12 @@ impl Error for ELBRecordParsingError {
     }
 }
 
-/// A utility method for retrieving the paths of all of the ELB log files in a directory.
+/// A utility method for retrieving all of the paths to ELB log files in a directory.
 ///
 /// If the user uses the [AWS S3 sync tool](http://docs.aws.amazon.com/cli/latest/reference/s3/sync.html)
-/// to download their AWS ELB logs to a local disk they files will be in a very specific directory
-/// hierarchy.  This utility will read the paths of the files recursively and return the list to the user for
-/// for use with process_files method.
+/// to download their AWS ELB logs to a local disk the files will be in a very specific directory
+/// hierarchy.  This utility will read the paths of the files, recursively searching a root
+/// specified by the user, and append the paths to the `Vec<DirEntry>`, also provided by the user.
 ///
 /// dir: The directory from which the paths of the ELB log files will be procured.
 ///
@@ -124,7 +121,7 @@ pub fn file_list(dir: &Path, filenames: &mut Vec<DirEntry>) -> Result<usize, wal
     Ok(filenames.len())
 }
 
-/// Attempt to parse every ELB record in every file in filenames and pass the results to the
+/// Attempt to parse every ELB record in every file in `filenames` and pass the results to the
 /// record_handler.
 ///
 /// Each file will be opened and each line, which should represent a ELB record, will be passed
@@ -372,7 +369,8 @@ impl RecordSplitterState {
 /// I could use the newtype pattern but the newtype pattern forces another level of indirection
 /// with no gain besides reducing the exposure a little. I hope that in the future we'll be able to
 /// implement public methods without having to expose, what should be, private details.
-/// This behaviour has been changed in 1.7.0 nightly.  This will be made private as soon as 1.7.0 is released.
+/// Update 02/14/2016: This behaviour has been changed in 1.7.0 nightly.
+/// This will be made private as soon as 1.7.0 is released.
 #[derive(Debug, PartialEq, Clone)]
 pub enum ELBRecordField {
     Timestamp = 0,
