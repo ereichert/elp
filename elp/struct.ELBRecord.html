@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `ELBRecord` struct in crate `elp`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, ELBRecord">
+
+    <title>elp::ELBRecord - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'><a href='index.html'>elp</a></p><script>window.sidebarCurrent = {name: 'ELBRecord', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content struct">
+<h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>elp</a>::<wbr><a class='struct' href=''>ELBRecord</a></span><span class='out-of-band'><span id='render-detail'>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-21' class='srclink' href='../src/elp/lib.rs.html#26-44' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct ELBRecord {
+    pub timestamp: <a class='struct' href='../chrono/datetime/struct.DateTime.html' title='chrono::datetime::DateTime'>DateTime</a>&lt;<a class='struct' href='../chrono/offset/utc/struct.UTC.html' title='chrono::offset::utc::UTC'>UTC</a>&gt;,
+    pub elb_name: <a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>,
+    pub client_address: <a class='struct' href='https://doc.rust-lang.org/nightly/std/net/addr/struct.SocketAddrV4.html' title='std::net::addr::SocketAddrV4'>SocketAddrV4</a>,
+    pub backend_address: <a class='struct' href='https://doc.rust-lang.org/nightly/std/net/addr/struct.SocketAddrV4.html' title='std::net::addr::SocketAddrV4'>SocketAddrV4</a>,
+    pub request_processing_time: <a href='https://doc.rust-lang.org/nightly/std/primitive.f32.html'>f32</a>,
+    pub backend_processing_time: <a href='https://doc.rust-lang.org/nightly/std/primitive.f32.html'>f32</a>,
+    pub response_processing_time: <a href='https://doc.rust-lang.org/nightly/std/primitive.f32.html'>f32</a>,
+    pub elb_status_code: <a href='https://doc.rust-lang.org/nightly/std/primitive.u16.html'>u16</a>,
+    pub backend_status_code: <a href='https://doc.rust-lang.org/nightly/std/primitive.u16.html'>u16</a>,
+    pub received_bytes: <a href='https://doc.rust-lang.org/nightly/std/primitive.u64.html'>u64</a>,
+    pub sent_bytes: <a href='https://doc.rust-lang.org/nightly/std/primitive.u64.html'>u64</a>,
+    pub request_method: <a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>,
+    pub request_url: <a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>,
+    pub request_http_version: <a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>,
+    pub user_agent: <a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>,
+    pub ssl_cipher: <a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>,
+    pub ssl_protocol: <a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>,
+}</pre><div class='docblock'><p>The product of parsing a single AWS ELB log record.</p>
+</div><h2 class='fields'>Fields</h2>
+<table><tr class='stab '>
+                                  <td id='structfield.timestamp'><code>timestamp</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.elb_name'><code>elb_name</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.client_address'><code>client_address</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.backend_address'><code>backend_address</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.request_processing_time'><code>request_processing_time</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.backend_processing_time'><code>backend_processing_time</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.response_processing_time'><code>response_processing_time</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.elb_status_code'><code>elb_status_code</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.backend_status_code'><code>backend_status_code</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.received_bytes'><code>received_bytes</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.sent_bytes'><code>sent_bytes</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.request_method'><code>request_method</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.request_url'><code>request_url</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.request_http_version'><code>request_http_version</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.user_agent'><code>user_agent</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.ssl_cipher'><code>ssl_cipher</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.ssl_protocol'><code>ssl_protocol</code></td><td></td></tr></table><h2 id='implementations'>Trait Implementations</h2><h3 id='derived_implementations'>Derived Implementations </h3><h3 class='impl'><code>impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html' title='core::fmt::Debug'>Debug</a> for <a class='struct' href='../elp/struct.ELBRecord.html' title='elp::ELBRecord'>ELBRecord</a></code></h3><div class='impl-items'><h4 id='method.fmt' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html#method.fmt' class='fnname'>fmt</a>(&amp;self, __arg_0: &amp;mut <a class='struct' href='https://doc.rust-lang.org/nightly/core/fmt/struct.Formatter.html' title='core::fmt::Formatter'>Formatter</a>) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/core/fmt/type.Result.html' title='core::fmt::Result'>Result</a></code></h4>
+</div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "elp";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    
+    <script async src="../search-index.js"></script>
+</body>
+</html>
