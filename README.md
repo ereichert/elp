@@ -9,6 +9,8 @@ for more information about them.
 
 This project supports the [Rust Code of Conduct](https://www.rust-lang.org/conduct.html).
 
+## [Documentation](http://ereichert.github.io/elp/elp/index.html)
+
 ##How To
 
 There is a full example of ELP's use in a production environment [here](https://github.com/trafficland/counter).
