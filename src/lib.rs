@@ -96,10 +96,6 @@ impl Error for ELBRecordParsingError {
             ELBRecordParsingError::CouldNotOpenFile { .. } => "failed to open file",
         }
     }
-
-    fn cause(&self) -> Option<&Error> {
-        Some(self)
-    }
 }
 
 /// A utility method for retrieving all of the paths to ELB log files in a directory.
