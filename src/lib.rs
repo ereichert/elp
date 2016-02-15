@@ -294,58 +294,42 @@ impl RecordSplitterState {
     }
 
     fn next(&mut self) {
-        self.current_field = self.next_field.clone();
+        self.current_field = self.next_field;
         match self.current_field {
             ELBRecordField::Timestamp => self.next_field = ELBRecordField::ELBName,
-
             ELBRecordField::ELBName => self.next_field = ELBRecordField::ClientAddress,
-
             ELBRecordField::ClientAddress => self.next_field = ELBRecordField::BackendAddress,
-
             ELBRecordField::BackendAddress => self.next_field = ELBRecordField::RequestProcessingTime,
-
             ELBRecordField::RequestProcessingTime => self.next_field = ELBRecordField::BackendProcessingTime,
-
             ELBRecordField::BackendProcessingTime => self.next_field = ELBRecordField::ResponseProcessingTime,
-
             ELBRecordField::ResponseProcessingTime => self.next_field = ELBRecordField::ELBStatusCode,
-
             ELBRecordField::ELBStatusCode => self.next_field = ELBRecordField::BackendStatusCode,
-
             ELBRecordField::BackendStatusCode => self.next_field = ELBRecordField::ReceivedBytes,
-
             ELBRecordField::ReceivedBytes => self.next_field = ELBRecordField::SentBytes,
-
             ELBRecordField::SentBytes => self.next_field = ELBRecordField::RequestMethod,
-
             ELBRecordField::RequestMethod => {
                 self.end_delimiter = SPACE;
                 self.next_field = ELBRecordField::RequestURL;
                 self.skip_next_n_chars = 1;
             },
-
             ELBRecordField::RequestURL => {
                 self.end_delimiter = SPACE;
                 self.next_field = ELBRecordField::RequestHTTPVersion;
             },
-
             ELBRecordField::RequestHTTPVersion => {
                 self.end_delimiter = DOUBLE_QUOTE;
                 self.next_field = ELBRecordField::UserAgent;
             },
-
             ELBRecordField::UserAgent => {
                 self.end_delimiter = DOUBLE_QUOTE;
                 self.next_field = ELBRecordField::SSLCipher;
                 self.skip_next_n_chars = 2;
             },
-
             ELBRecordField::SSLCipher => {
                 self.end_delimiter = SPACE;
                 self.next_field = ELBRecordField::SSLProtocol;
                 self.skip_next_n_chars = 1;
             },
-
             ELBRecordField::SSLProtocol => {
                 self.end_delimiter = SPACE;
                 self.next_field = ELBRecordField::RequestHTTPVersion;
@@ -362,7 +346,7 @@ impl RecordSplitterState {
 /// implement public methods without having to expose, what should be, private details.
 /// Update 02/14/2016: This behaviour has been changed in 1.7.0 nightly.
 /// This will be made private as soon as 1.7.0 is released.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ELBRecordField {
     Timestamp = 0,
     ELBName,
@@ -426,7 +410,6 @@ trait ELBRecordFieldParser {
 }
 
 impl<'a> ELBRecordFieldParser for Vec<&'a str> {
-
     fn parse_field<T>(
         &self,
         field_name: ELBRecordField,
@@ -435,7 +418,7 @@ impl<'a> ELBRecordFieldParser for Vec<&'a str> {
         where T: FromStr,
         T::Err: Error + 'static,
     {
-        let raw_prop = &self[field_name.clone()];
+        let raw_prop = &self[field_name];
         match raw_prop.parse::<T>() {
             Ok(parsed) => Some(parsed),
 
