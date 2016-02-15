@@ -23,9 +23,9 @@ const ELB_RECORD_V2_FIELD_COUNT: usize = 17;
 
 /// The product of parsing a single AWS ELB log record.
 #[derive(Debug)]
-pub struct ELBRecord {
+pub struct ELBRecord<'a> {
     pub timestamp: DateTime<UTC>,
-    pub elb_name: String,
+    pub elb_name: &'a str,
     pub client_address: SocketAddrV4,
     pub backend_address: SocketAddrV4,
     pub request_processing_time: f32,
@@ -35,16 +35,16 @@ pub struct ELBRecord {
     pub backend_status_code: u16,
     pub received_bytes: u64,
     pub sent_bytes: u64,
-    pub request_method: String,
-    pub request_url: String,
-    pub request_http_version: String,
-    pub user_agent: String,
-    pub ssl_cipher: String,
-    pub ssl_protocol: String
+    pub request_method: &'a str,
+    pub request_url: &'a str,
+    pub request_http_version: &'a str,
+    pub user_agent: &'a str,
+    pub ssl_cipher: &'a str,
+    pub ssl_protocol: &'a str
 }
 
 /// The result of an attempt to parse an ELB record.
-pub type ParsingResult<'a> = Result<ELBRecord, ParsingErrors<'a>>;
+pub type ParsingResult<'a> = Result<ELBRecord<'a>, ParsingErrors<'a>>;
 
 /// The result of a failed attempt to parse an ELB record.
 ///
@@ -180,7 +180,7 @@ fn handle_file<H>(file: File, record_handler: &mut H) -> usize
 /// This is the main parsing algorithm.  It will attempt to parse every field that is supposed to
 /// be in an ELB Access log record.  If it successful it will return an `Ok(ELBRecord)`.  If not,
 /// it will return a `Err(ParsingErrors)`.
-pub fn parse_record(record: &str) -> ParsingResult {
+pub fn parse_record<'a>(record: &'a str) -> ParsingResult<'a> {
     let mut errors: Vec<ELBRecordParsingError> = Vec::new();
 
     //record is borrowed by split_record which means ownership of
@@ -209,8 +209,8 @@ pub fn parse_record(record: &str) -> ParsingResult {
 
     if split_record.len() == ELB_RECORD_V2_FIELD_COUNT {
         user_agent = split_record[ELBRecordField::UserAgent].trim_matches('"');
-        ssl_cipher = &split_record[ELBRecordField::SSLCipher];
-        ssl_protocol = &split_record[ELBRecordField::SSLProtocol];
+        ssl_cipher = split_record[ELBRecordField::SSLCipher];
+        ssl_protocol = split_record[ELBRecordField::SSLProtocol];
     }
 
     if errors.is_empty() {
@@ -218,7 +218,7 @@ pub fn parse_record(record: &str) -> ParsingResult {
         Ok(
             ELBRecord {
                 timestamp: ts.unwrap(),
-                elb_name: split_record[ELBRecordField::ELBName].to_owned(),
+                elb_name: split_record[ELBRecordField::ELBName],
                 client_address: clnt_addr.unwrap(),
                 backend_address: be_addr.unwrap(),
                 request_processing_time: req_proc_time.unwrap(),
@@ -228,12 +228,12 @@ pub fn parse_record(record: &str) -> ParsingResult {
                 backend_status_code: be_sc.unwrap(),
                 received_bytes: bytes_received.unwrap(),
                 sent_bytes: bytes_sent.unwrap(),
-                request_method: split_record[ELBRecordField::RequestMethod].trim_matches('"').to_owned(),
-                request_url: split_record[ELBRecordField::RequestURL].to_owned(),
-                request_http_version: split_record[ELBRecordField::RequestHTTPVersion].trim_matches('"').to_owned(),
-                user_agent: user_agent.to_owned(),
-                ssl_cipher: ssl_cipher.to_owned(),
-                ssl_protocol: ssl_protocol.to_owned()
+                request_method: split_record[ELBRecordField::RequestMethod].trim_matches('"'),
+                request_url: split_record[ELBRecordField::RequestURL],
+                request_http_version: split_record[ELBRecordField::RequestHTTPVersion].trim_matches('"'),
+                user_agent: user_agent,
+                ssl_cipher: ssl_cipher,
+                ssl_protocol: ssl_protocol
             }
         )
     } else {
@@ -245,8 +245,7 @@ trait RecordSplitter {
     fn split_record(&self) -> Vec<&str>;
 }
 
-impl<'a> RecordSplitter for &'a str {
-
+impl RecordSplitter for str {
     fn split_record(&self) -> Vec<&str> {
         let mut split_record: Vec<&str> = Vec::with_capacity(ELB_RECORD_V2_FIELD_COUNT);
         let mut parsing_context = RecordSplitterState::new();
@@ -368,10 +367,10 @@ pub enum ELBRecordField {
 }
 
 impl<'a> Index<ELBRecordField> for Vec<&'a str> {
-    type Output = str;
+    type Output = &'a str;
 
-    fn index(&self, idx: ELBRecordField) -> &str {
-        self[idx as usize]
+    fn index(&self, idx: ELBRecordField) -> & &'a str {
+        &self[idx as usize]
     }
 }
 
