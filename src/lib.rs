@@ -44,7 +44,7 @@ pub struct ELBRecord {
 }
 
 /// The result of an attempt to parse an ELB record.
-pub type ParsingResult = Result<Box<ELBRecord>, ParsingErrors>;
+pub type ParsingResult<'a> = Result<ELBRecord, ParsingErrors<'a>>;
 
 /// The result of a failed attempt to parse an ELB record.
 ///
@@ -53,9 +53,9 @@ pub type ParsingResult = Result<Box<ELBRecord>, ParsingErrors>;
 /// parsable to make it clear what fields of the record were faulty and allow the user to decide
 /// how to handle the failure.
 #[derive(Debug)]
-pub struct ParsingErrors {
+pub struct ParsingErrors<'a> {
     /// The raw record.
-    pub record: String,
+    pub record: &'a str,
     /// A collection of parsing errors such as fields that could not be parsed or a failure to
     /// open an ELB log file.
     pub errors: Vec<ELBRecordParsingError>,
@@ -114,10 +114,8 @@ impl Error for ELBRecordParsingError {
 /// filenames: A Vec<DirEntry> to which the paths of the ELB log files will be written.
 pub fn file_list(dir: &Path, filenames: &mut Vec<DirEntry>) -> Result<usize, walkdir::Error> {
     for entry in WalkDir::new(dir).min_depth(1) {
-        match entry {
-            Err(err) => return Err(err),
-            Ok(entry) => filenames.push(entry),
-        }
+        let entry = try!(entry);
+        filenames.push(entry);
     }
     Ok(filenames.len())
 }
@@ -148,7 +146,7 @@ pub fn process_files<H>(filenames: &[DirEntry], record_handler: &mut H) -> usize
             Err(_) => {
                 record_handler(
                     Err(ParsingErrors {
-                        record: "".to_owned(),
+                        record: "",
                         errors: vec![ELBRecordParsingError::CouldNotOpenFile { path: format!("{}", filename.path().display()) }]
                     })
                 )
@@ -165,12 +163,12 @@ fn handle_file<H>(file: File, record_handler: &mut H) -> usize
     for possible_record in BufReader::new(&file).lines() {
         file_record_count += 1;
         match possible_record {
-            Ok(record) => record_handler(parse_record(record)),
+            Ok(record) => record_handler(parse_record(&record)),
 
             Err(_) => {
                 record_handler(
                     Err(ParsingErrors {
-                        record: "".to_owned(),
+                        record: "",
                         errors: vec![ELBRecordParsingError::LineReadError]
                     })
                 )
@@ -186,81 +184,72 @@ fn handle_file<H>(file: File, record_handler: &mut H) -> usize
 /// This is the main parsing algorithm.  It will attempt to parse every field that is supposed to
 /// be in an ELB Access log record.  If it successful it will return an `Ok(ELBRecord)`.  If not,
 /// it will return a `Err(ParsingErrors)`.
-pub fn parse_record(record: String) -> ParsingResult {
-    let mut errors: Vec<ELBRecordParsingError> = Vec::with_capacity(ELB_RECORD_V2_FIELD_COUNT);
+pub fn parse_record(record: &str) -> ParsingResult {
+    let mut errors: Vec<ELBRecordParsingError> = Vec::new();
 
-    {
-        //record is borrowed by split_record which means ownership of
-        //record cannot be transferred to ParsingErrors until the borrow is complete.
-        //Scoping this section of code seems more readable than creating a separate function
-        //just to mitigate the borrow.
-        let split_record: Vec<&str> = record.split_record();
-        if split_record.len() != ELB_RECORD_V1_FIELD_COUNT && split_record.len() != ELB_RECORD_V2_FIELD_COUNT {
-            errors.push(ELBRecordParsingError::MalformedRecord);
-            None
-        } else {
-            let ts = split_record.parse_field(ELBRecordField::Timestamp, &mut errors);
-            let clnt_addr = split_record.parse_field(ELBRecordField::ClientAddress, &mut errors);
-            let be_addr = split_record.parse_field(ELBRecordField::BackendAddress, &mut errors);
-            let req_proc_time = split_record.parse_field(ELBRecordField::RequestProcessingTime, &mut errors);
-            let be_proc_time = split_record.parse_field(ELBRecordField::BackendProcessingTime, &mut errors);
-            let res_proc_time = split_record.parse_field(ELBRecordField::ResponseProcessingTime, &mut errors);
-            let elb_sc = split_record.parse_field(ELBRecordField::ELBStatusCode, &mut errors);
-            let be_sc = split_record.parse_field(ELBRecordField::BackendStatusCode, &mut errors);
-            let bytes_received = split_record.parse_field(ELBRecordField::ReceivedBytes, &mut errors);
-            let bytes_sent = split_record.parse_field(ELBRecordField::SentBytes, &mut errors);
-            let mut user_agent = "-";
-            let mut ssl_cipher = "-";
-            let mut ssl_protocol = "-";
+    //record is borrowed by split_record which means ownership of
+    //record cannot be transferred to ParsingErrors until the borrow is complete.
+    //Scoping this section of code seems more readable than creating a separate function
+    //just to mitigate the borrow.
+    let split_record: Vec<&str> = record.split_record();
+    if split_record.len() != ELB_RECORD_V1_FIELD_COUNT && split_record.len() != ELB_RECORD_V2_FIELD_COUNT {
+        errors.push(ELBRecordParsingError::MalformedRecord);
+        return Err(ParsingErrors { record: record, errors: errors })
+    }
+    
+    let ts = split_record.parse_field(ELBRecordField::Timestamp, &mut errors);
+    let clnt_addr = split_record.parse_field(ELBRecordField::ClientAddress, &mut errors);
+    let be_addr = split_record.parse_field(ELBRecordField::BackendAddress, &mut errors);
+    let req_proc_time = split_record.parse_field(ELBRecordField::RequestProcessingTime, &mut errors);
+    let be_proc_time = split_record.parse_field(ELBRecordField::BackendProcessingTime, &mut errors);
+    let res_proc_time = split_record.parse_field(ELBRecordField::ResponseProcessingTime, &mut errors);
+    let elb_sc = split_record.parse_field(ELBRecordField::ELBStatusCode, &mut errors);
+    let be_sc = split_record.parse_field(ELBRecordField::BackendStatusCode, &mut errors);
+    let bytes_received = split_record.parse_field(ELBRecordField::ReceivedBytes, &mut errors);
+    let bytes_sent = split_record.parse_field(ELBRecordField::SentBytes, &mut errors);
+    let mut user_agent = "-";
+    let mut ssl_cipher = "-";
+    let mut ssl_protocol = "-";
 
-            if split_record.len() == ELB_RECORD_V2_FIELD_COUNT {
-                user_agent = split_record[ELBRecordField::UserAgent].trim_matches('"');
-                ssl_cipher = &split_record[ELBRecordField::SSLCipher];
-                ssl_protocol = &split_record[ELBRecordField::SSLProtocol];
+    if split_record.len() == ELB_RECORD_V2_FIELD_COUNT {
+        user_agent = split_record[ELBRecordField::UserAgent].trim_matches('"');
+        ssl_cipher = &split_record[ELBRecordField::SSLCipher];
+        ssl_protocol = &split_record[ELBRecordField::SSLProtocol];
+    }
+
+    if errors.is_empty() {
+        //If errors is empty it is more than likely parsing was successful and unwrap is safe.
+        Ok(
+            ELBRecord {
+                timestamp: ts.unwrap(),
+                elb_name: split_record[ELBRecordField::ELBName].to_owned(),
+                client_address: clnt_addr.unwrap(),
+                backend_address: be_addr.unwrap(),
+                request_processing_time: req_proc_time.unwrap(),
+                backend_processing_time: be_proc_time.unwrap(),
+                response_processing_time: res_proc_time.unwrap(),
+                elb_status_code: elb_sc.unwrap(),
+                backend_status_code: be_sc.unwrap(),
+                received_bytes: bytes_received.unwrap(),
+                sent_bytes: bytes_sent.unwrap(),
+                request_method: split_record[ELBRecordField::RequestMethod].trim_matches('"').to_owned(),
+                request_url: split_record[ELBRecordField::RequestURL].to_owned(),
+                request_http_version: split_record[ELBRecordField::RequestHTTPVersion].trim_matches('"').to_owned(),
+                user_agent: user_agent.to_owned(),
+                ssl_cipher: ssl_cipher.to_owned(),
+                ssl_protocol: ssl_protocol.to_owned()
             }
-
-            if errors.is_empty() {
-                //If errors is empty it is more than likely parsing was successful and unwrap is safe.
-                Some(
-                    ELBRecord {
-                        timestamp: ts.unwrap(),
-                        elb_name: split_record[ELBRecordField::ELBName].to_owned(),
-                        client_address: clnt_addr.unwrap(),
-                        backend_address: be_addr.unwrap(),
-                        request_processing_time: req_proc_time.unwrap(),
-                        backend_processing_time: be_proc_time.unwrap(),
-                        response_processing_time: res_proc_time.unwrap(),
-                        elb_status_code: elb_sc.unwrap(),
-                        backend_status_code: be_sc.unwrap(),
-                        received_bytes: bytes_received.unwrap(),
-                        sent_bytes: bytes_sent.unwrap(),
-                        request_method: split_record[ELBRecordField::RequestMethod].trim_matches('"').to_owned(),
-                        request_url: split_record[ELBRecordField::RequestURL].to_owned(),
-                        request_http_version: split_record[ELBRecordField::RequestHTTPVersion].trim_matches('"').to_owned(),
-                        user_agent: user_agent.to_owned(),
-                        ssl_cipher: ssl_cipher.to_owned(),
-                        ssl_protocol: ssl_protocol.to_owned()
-                    }
-                )
-            } else {
-                None
-            }
-        }
-    }.map( |elb_rec|
-        Ok(Box::new(elb_rec))
-    ).unwrap_or_else( ||
-        Err(ParsingErrors {
-            record: record,
-            errors: errors
-        })
-    )
+        )
+    } else {
+        Err(ParsingErrors { record: record, errors: errors })
+    }
 }
 
 trait RecordSplitter {
     fn split_record(&self) -> Vec<&str>;
 }
 
-impl RecordSplitter for String {
+impl<'a> RecordSplitter for &'a str {
 
     fn split_record(&self) -> Vec<&str> {
         let mut split_record: Vec<&str> = Vec::with_capacity(ELB_RECORD_V2_FIELD_COUNT);
@@ -486,42 +475,42 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_ssl_protocol_set_to_a_not_available_symbol_when_it_is_not_present() {
-        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
 
 		assert_eq!(elb_record.ssl_protocol, "-")
 	}
 
     #[test]
 	fn parse_record_returns_a_record_with_the_ssl_protocol_when_it_is_present() {
-        let elb_record = parse_record(V2_TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V2_TEST_RECORD).unwrap();
 
 		assert_eq!(elb_record.ssl_protocol, "some_ssl_protocol")
 	}
 
     #[test]
 	fn parse_record_returns_a_record_with_the_ssl_cipher_set_to_a_not_available_symbol_when_it_is_not_present() {
-        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
 
 		assert_eq!(elb_record.ssl_cipher, "-")
 	}
 
     #[test]
 	fn parse_record_returns_a_record_with_the_ssl_cipher_when_it_is_present() {
-        let elb_record = parse_record(V2_TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V2_TEST_RECORD).unwrap();
 
 		assert_eq!(elb_record.ssl_cipher, "some_ssl_cipher")
 	}
 
     #[test]
 	fn parse_record_returns_a_record_with_the_user_agent_set_to_a_not_available_symbol_when_it_is_not_present() {
-        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
 
 		assert_eq!(elb_record.user_agent, "-")
 	}
 
     #[test]
 	fn parse_record_returns_a_record_with_the_user_agent_when_it_is_present() {
-        let elb_record = parse_record(V2_TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V2_TEST_RECORD).unwrap();
 
 		assert_eq!(elb_record.user_agent, "Mozilla/5.0 (cloud; like Mac OS X; en-us) AppleWebKit/537.36.0 (KHTML, like Gecko) Version/4.0.4 Mobile/7B334b Safari/537.36.0")
 	}
@@ -533,35 +522,35 @@ mod tests {
         \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\" \
         ";
 
-        let malformed_error = parse_record(short_record.to_string()).unwrap_err().errors.pop();
+        let malformed_error = parse_record(short_record).unwrap_err().errors.pop();
 
 		assert_eq!(malformed_error, Some(ELBRecordParsingError::MalformedRecord))
 	}
 
     #[test]
 	fn parse_record_returns_a_record_with_the_request_http_version() {
-        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
 
 		assert_eq!(elb_record.request_http_version, "HTTP/1.1")
 	}
 
     #[test]
 	fn parse_record_returns_a_record_with_the_request_url() {
-        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
 
 		assert_eq!(elb_record.request_url, "http://some.domain.com:80/path0/path1?param0=p0&param1=p1")
 	}
 
     #[test]
 	fn parse_record_returns_a_record_with_the_request_method() {
-        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
 
 		assert_eq!(elb_record.request_method, "GET")
 	}
 
     #[test]
 	fn parse_record_returns_a_record_with_the_sent_bytes() {
-        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
 
 		assert_eq!(elb_record.sent_bytes, 7582)
 	}
@@ -573,7 +562,7 @@ mod tests {
           \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
           ";
 
-          let error_field_name = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+          let error_field_name = match parse_record(bad_record).unwrap_err().errors.pop().unwrap() {
               ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
               _ => panic!(),
           };
@@ -583,7 +572,7 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_received_bytes() {
-        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
 
 		assert_eq!(elb_record.received_bytes, 0)
 	}
@@ -595,7 +584,7 @@ mod tests {
           \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
           ";
 
-          let error_field_name = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+          let error_field_name = match parse_record(bad_record).unwrap_err().errors.pop().unwrap() {
               ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
               _ => panic!(),
           };
@@ -605,7 +594,7 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_backend_status_code() {
-        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
 
 		assert_eq!(elb_record.backend_status_code, 200)
 	}
@@ -617,7 +606,7 @@ mod tests {
           \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
           ";
 
-          let error_field_name = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+          let error_field_name = match parse_record(bad_record).unwrap_err().errors.pop().unwrap() {
               ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
               _ => panic!(),
           };
@@ -627,7 +616,7 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_elb_status_code() {
-        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
 
 		assert_eq!(elb_record.elb_status_code, 200)
 	}
@@ -639,7 +628,7 @@ mod tests {
           \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
           ";
 
-          let error_field_name = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+          let error_field_name = match parse_record(bad_record).unwrap_err().errors.pop().unwrap() {
               ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
               _ => panic!(),
           };
@@ -649,7 +638,7 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_response_processing_time() {
-        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
 
 		assert_eq!(elb_record.response_processing_time, 0.00003)
 	}
@@ -661,7 +650,7 @@ mod tests {
           \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
           ";
 
-          let error_field_name = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+          let error_field_name = match parse_record(bad_record).unwrap_err().errors.pop().unwrap() {
               ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
               _ => panic!(),
           };
@@ -671,7 +660,7 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_backend_processing_time() {
-        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
 
 		assert_eq!(elb_record.backend_processing_time, 0.145507)
 	}
@@ -683,7 +672,7 @@ mod tests {
           \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
           ";
 
-          let error_field_name = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+          let error_field_name = match parse_record(bad_record).unwrap_err().errors.pop().unwrap() {
               ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
               _ => panic!(),
           };
@@ -693,7 +682,7 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_request_processing_time() {
-        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
 
 		assert_eq!(elb_record.request_processing_time, 0.000039)
 	}
@@ -705,7 +694,7 @@ mod tests {
           \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
           ";
 
-          let error_field_name = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+          let error_field_name = match parse_record(bad_record).unwrap_err().errors.pop().unwrap() {
               ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
               _ => panic!(),
           };
@@ -715,7 +704,7 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_backend_address() {
-        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
 
 		assert_eq!(elb_record.backend_address, "172.16.1.5:9000".parse().unwrap())
 	}
@@ -727,7 +716,7 @@ mod tests {
         \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
         ";
 
-        let error_field_name = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+        let error_field_name = match parse_record(bad_record).unwrap_err().errors.pop().unwrap() {
             ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
             _ => panic!(),
         };
@@ -737,7 +726,7 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_client_address() {
-        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
 
 		assert_eq!(elb_record.client_address, "172.16.1.6:54814".parse().unwrap())
 	}
@@ -749,7 +738,7 @@ mod tests {
         \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
         ";
 
-        let error_field_name = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+        let error_field_name = match parse_record(bad_record).unwrap_err().errors.pop().unwrap() {
             ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
             _ => panic!(),
         };
@@ -759,7 +748,7 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_timestamp() {
-        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
 
 		assert_eq!(format!("{:?}", elb_record.timestamp), "2015-08-15T23:43:05.302180Z")
 	}
@@ -771,7 +760,7 @@ mod tests {
         \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
         ";
 
-        let error_field_name = match parse_record(bad_record.to_string()).unwrap_err().errors.pop().unwrap() {
+        let error_field_name = match parse_record(bad_record).unwrap_err().errors.pop().unwrap() {
             ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
             _ => panic!(),
         };
@@ -781,7 +770,7 @@ mod tests {
 
     #[test]
 	fn parse_record_returns_a_record_with_the_elb_name() {
-        let elb_record = parse_record(V1_TEST_RECORD.to_string()).unwrap();
+        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
 
 		assert_eq!(elb_record.elb_name, "elb-name")
 	}
