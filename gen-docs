@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+cargo doc
+cp target/doc/* .
+cp -r target/doc/elp .
