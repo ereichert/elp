@@ -61,7 +61,8 @@ pub struct ParsingErrors {
     pub errors: Vec<ELBRecordParsingError>,
 }
 
-/// Specific parsing errors that are returned as part of the `ParsingErrors::errors` collection.
+/// Specific parsing errors that are returned as part of the [ParsingErrors::errors]
+/// (struct.ParsingErrors.html) collection.
 #[derive(Debug, PartialEq)]
 pub enum ELBRecordParsingError {
     /// Returned if the record does not have the correct number of fields.
@@ -180,7 +181,12 @@ fn handle_file<H>(file: File, record_handler: &mut H) -> usize
     file_record_count
 }
 
-fn parse_record(record: String) -> ParsingResult {
+/// Attempt to parse a single string into an ELB record.
+///
+/// This is the main parsing algorithm.  It will attempt to parse every field that is supposed to
+/// be in an ELB Access log record.  If it successful it will return an `Ok(ELBRecord)`.  If not,
+/// it will return a `Err(ParsingErrors)`.
+pub fn parse_record(record: String) -> ParsingResult {
     let mut errors: Vec<ELBRecordParsingError> = Vec::with_capacity(ELB_RECORD_V2_FIELD_COUNT);
 
     {
