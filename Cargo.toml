@@ -6,7 +6,7 @@ description = "AWS ELB Access Log Parser"
 documentation = "http://ereichert.github.io/elp/elp/index.html"
 homepage = "https://github.com/ereichert/elp"
 repository = "https://github.com/ereichert/elp"
-keywords = ["aws", "amazon web services", "elastic load balancer", "logs", "parser"]
+keywords = ["aws", "amazon", "elb", "logs", "parser"]
 license = "Apache-2.0"
 
 [dependencies]
