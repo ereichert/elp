@@ -19,7 +19,7 @@ Add ELP as a dependency.  Add the following to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-elp = "0.99.0"
+elp = "1.0.0"
 ```
 Then reference it as an external crate in your code.
 

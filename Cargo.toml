@@ -1,6 +1,6 @@
 [package]
 name = "elp"
-version = "0.99.0"
+version = "1.0.0"
 authors = ["Eric D. Reichert <eric@reichertconsulting.com>"]
 description = "AWS ELB Access Log Parser"
 documentation = "http://ereichert.github.io/elp/elp/index.html"
