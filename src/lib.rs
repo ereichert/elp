@@ -196,12 +196,6 @@ fn handle_file<H>(file: File, record_handler: &mut H) -> usize
 /// it will return a `Err(ParsingErrors)`.
 pub fn parse_record<'a>(record: &'a str) -> ParsingResult<'a> {
     let mut errors: Vec<ELBRecordParsingError> = Vec::new();
-
-    // record is borrowed by split_record which means ownership of
-    // record cannot be transferred to ParsingErrors until the borrow is complete.
-    // Scoping this section of code seems more readable than creating a separate
-    // function
-    // just to mitigate the borrow.
     let split_record: Vec<&str> = record.split_record();
     if split_record.len() != ELB_RECORD_V1_FIELD_COUNT &&
        split_record.len() != ELB_RECORD_V2_FIELD_COUNT {
