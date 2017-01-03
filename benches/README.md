@@ -1,5 +1,11 @@
 ### cargo bench runs
 
+01/02/2017 -
+
+Upgraded to rustc 1.16.0-nightly (4ecc85beb 2016-12-28)
+
+test bench_parse_line ... bench:       1,775 ns/iter (+/- 283)
+
 02/12/2016 -
 
 Upgraded to Rust 1.7.0 nightly.

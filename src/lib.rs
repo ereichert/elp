@@ -4,7 +4,7 @@ extern crate chrono;
 extern crate log;
 
 use std::path::Path;
-use self::walkdir::{DirEntry, WalkDir};
+use self::walkdir::{DirEntry, WalkDir, WalkDirIterator};
 use std::fs::File;
 use std::io::BufReader;
 use std::io::BufRead;
@@ -121,8 +121,12 @@ impl Error for ELBRecordParsingError {
 ///
 /// filenames: A Vec<DirEntry> to which the paths of the ELB log files will be written.
 pub fn file_list(dir: &Path, filenames: &mut Vec<DirEntry>) -> Result<usize, walkdir::Error> {
-    for entry in WalkDir::new(dir).min_depth(1) {
-        let entry = try!(entry);
+    let dir_entries = WalkDir::new(dir)
+        .min_depth(1)
+        .into_iter()
+        .filter_entry(|e| e.file_name().to_str().map(|s| s.ends_with(".log")).unwrap_or(false));
+    for entry in dir_entries {
+        let entry = entry?;
         filenames.push(entry);
     }
     Ok(filenames.len())

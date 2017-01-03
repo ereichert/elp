@@ -1,6 +1,6 @@
 [package]
 name = "elp"
-version = "1.0.0"
+version = "1.0.1"
 authors = ["Eric D. Reichert <eric@reichertconsulting.com>"]
 description = "AWS ELB Access Log Parser"
 documentation = "http://ereichert.github.io/elp/elp/index.html"
@@ -10,6 +10,6 @@ keywords = ["aws", "amazon", "elb", "logs", "parser"]
 license = "Apache-2.0"
 
 [dependencies]
-walkdir = "0.1.5"
+walkdir = "1.0.7"
 chrono = "0.2.19"
 log = "0.3.5"
