@@ -270,22 +270,24 @@ trait RecordSplitter {
 impl RecordSplitter for str {
     fn split_record(&self) -> Vec<&str> {
         let mut split_record: Vec<&str> = Vec::with_capacity(ELB_RECORD_V2_FIELD_COUNT);
-        let mut parsing_context = RecordSplitterState::new();
+        let mut splitter_state = RecordSplitterState::new();
         for (current_idx, next_char) in self.trim_left().char_indices() {
-            if current_idx == (self.len() - 1) {
-                // The end of the record has been reached. Push the rest of the chars into the
-                // vec.
-                split_record.push(&self[parsing_context.start_of_field_index..current_idx + 1]);
-            } else if parsing_context.skip_next_n_chars > 0 {
-                parsing_context.skip_next_n_chars -= 1;
-                parsing_context.start_of_field_index += 1;
-            } else if next_char == parsing_context.end_delimiter {
-                split_record.push(&self[parsing_context.start_of_field_index..current_idx]);
-                parsing_context.start_of_field_index = current_idx + 1;
-                parsing_context.next();
+            if splitter_state.skip_next_n_chars > 0 {
+                splitter_state.skip_next_n_chars -= 1;
+                splitter_state.start_of_field_index += 1;
+            } else if next_char == splitter_state.end_delimiter {
+                split_record.push(&self[splitter_state.start_of_field_index..current_idx]);
+                splitter_state.start_of_field_index = current_idx + 1;
+                splitter_state.next();
             }
         }
-        debug!("{:?}", parsing_context);
+
+        let x = &self[splitter_state.start_of_field_index..];
+        if !x.is_empty() {
+            split_record.push(x);
+        }
+
+        debug!("{:?}", splitter_state);
         debug!("{:?}", split_record);
         split_record
     }
