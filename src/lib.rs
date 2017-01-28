@@ -271,11 +271,11 @@ impl RecordSplitter for str {
     fn split_record(&self) -> Vec<&str> {
         let mut split_record: Vec<&str> = Vec::with_capacity(ELB_RECORD_V2_FIELD_COUNT);
         let mut splitter_state = RecordSplitterState::new();
-        for (current_idx, next_char) in self.trim_left().char_indices() {
-            if splitter_state.skip_next_n_chars > 0 {
-                splitter_state.skip_next_n_chars -= 1;
-                splitter_state.start_of_field_index += 1;
-            } else if next_char == splitter_state.end_delimiter {
+        for (current_idx, current_char) in self.trim_left().char_indices() {
+            if splitter_state.start_delimiter.map(|sd| current_char == sd).unwrap_or(false) {
+                splitter_state.start_of_field_index = current_idx + 1;
+                splitter_state.start_delimiter = None;
+            } else if splitter_state.start_delimiter.is_none() && current_char == splitter_state.end_delimiter {
                 split_record.push(&self[splitter_state.start_of_field_index..current_idx]);
                 splitter_state.start_of_field_index = current_idx + 1;
                 splitter_state.next();
@@ -295,10 +295,10 @@ impl RecordSplitter for str {
 
 #[derive(Debug)]
 struct RecordSplitterState {
+    start_delimiter: Option<char>,
     end_delimiter: char,
     current_field: ELBRecordField,
     next_field: ELBRecordField,
-    skip_next_n_chars: usize,
     start_of_field_index: usize,
 }
 
@@ -307,11 +307,11 @@ const DOUBLE_QUOTE: char = '"';
 impl RecordSplitterState {
     fn new() -> RecordSplitterState {
         RecordSplitterState {
+            start_delimiter: None,
             end_delimiter: SPACE,
             // current_field makes debugging a little easier.
             current_field: ELBRecordField::Timestamp,
             next_field: ELBRecordField::ELBName,
-            skip_next_n_chars: 0,
             start_of_field_index: 0,
         }
     }
@@ -339,9 +339,9 @@ impl RecordSplitterState {
             ELBRecordField::ReceivedBytes => self.next_field = ELBRecordField::SentBytes,
             ELBRecordField::SentBytes => self.next_field = ELBRecordField::RequestMethod,
             ELBRecordField::RequestMethod => {
+                self.start_delimiter = Some(DOUBLE_QUOTE);
                 self.end_delimiter = SPACE;
                 self.next_field = ELBRecordField::RequestURL;
-                self.skip_next_n_chars = 1;
             }
             ELBRecordField::RequestURL => {
                 self.end_delimiter = SPACE;
@@ -352,14 +352,14 @@ impl RecordSplitterState {
                 self.next_field = ELBRecordField::UserAgent;
             }
             ELBRecordField::UserAgent => {
+                self.start_delimiter = Some(DOUBLE_QUOTE);
                 self.end_delimiter = DOUBLE_QUOTE;
                 self.next_field = ELBRecordField::SSLCipher;
-                self.skip_next_n_chars = 2;
             }
             ELBRecordField::SSLCipher => {
+                self.start_delimiter = Some(SPACE);
                 self.end_delimiter = SPACE;
                 self.next_field = ELBRecordField::SSLProtocol;
-                self.skip_next_n_chars = 1;
             }
             ELBRecordField::SSLProtocol => {
                 self.end_delimiter = SPACE;
