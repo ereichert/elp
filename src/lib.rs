@@ -2,6 +2,8 @@ extern crate walkdir;
 extern crate chrono;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate lazy_static;
 
 use std::path::Path;
 use self::walkdir::{DirEntry, WalkDir, WalkDirIterator};
@@ -227,7 +229,7 @@ pub fn parse_record<'a>(record: &'a str) -> ParsingResult<'a> {
     let mut ssl_protocol = "-";
 
     if split_record.len() == ELB_RECORD_V2_FIELD_COUNT {
-        user_agent = split_record[ELBRecordField::UserAgent].trim_matches('"');
+        user_agent = split_record[ELBRecordField::UserAgent];
         ssl_cipher = split_record[ELBRecordField::SSLCipher];
         ssl_protocol = split_record[ELBRecordField::SSLProtocol];
     }
@@ -247,10 +249,9 @@ pub fn parse_record<'a>(record: &'a str) -> ParsingResult<'a> {
             backend_status_code: be_sc.unwrap(),
             received_bytes: bytes_received.unwrap(),
             sent_bytes: bytes_sent.unwrap(),
-            request_method: split_record[ELBRecordField::RequestMethod].trim_matches('"'),
+            request_method: split_record[ELBRecordField::RequestMethod],
             request_url: split_record[ELBRecordField::RequestURL],
-            request_http_version: split_record[ELBRecordField::RequestHTTPVersion]
-                                      .trim_matches('"'),
+            request_http_version: split_record[ELBRecordField::RequestHTTPVersion],
             user_agent: user_agent,
             ssl_cipher: ssl_cipher,
             ssl_protocol: ssl_protocol,
@@ -270,107 +271,137 @@ trait RecordSplitter {
 impl RecordSplitter for str {
     fn split_record(&self) -> Vec<&str> {
         let mut split_record: Vec<&str> = Vec::with_capacity(ELB_RECORD_V2_FIELD_COUNT);
-        let mut splitter_state = RecordSplitterState::new();
+        let mut field_specs_idx = 0;
+        let mut current_field_spec = &ORDERED_FIELD_SPECS[field_specs_idx];
+        let mut current_start_delim = current_field_spec.start_delimiter;
+        let mut start_of_field_index = 0;
+
         for (current_idx, current_char) in self.trim_left().char_indices() {
-            match splitter_state.start_delimiter {
-                None if current_char == splitter_state.end_delimiter => {
-                    split_record.push(&self[splitter_state.start_of_field_index..current_idx]);
-                    splitter_state.start_of_field_index = current_idx + 1;
-                    splitter_state.next();
+            match current_start_delim {
+                None if current_char == current_field_spec.end_delimiter => {
+                    split_record.push(&self[start_of_field_index..current_idx]);
+                    start_of_field_index = current_idx + 1;
+                    field_specs_idx += 1;
+                    if field_specs_idx < ELB_RECORD_V2_FIELD_COUNT {
+                        current_field_spec = &ORDERED_FIELD_SPECS[field_specs_idx];
+                        current_start_delim = current_field_spec.start_delimiter;
+                    }
                 },
                 Some(sd) if current_char == sd => {
-                    splitter_state.start_of_field_index = current_idx + 1;
-                    splitter_state.start_delimiter = None;
+                    start_of_field_index = current_idx + 1;
+                    current_start_delim = None;
                 },
                 _ => {}
             }
         }
 
-        let x = &self[splitter_state.start_of_field_index..];
+        let x = &self[start_of_field_index..];
         if !x.is_empty() {
             split_record.push(x);
         }
 
-        debug!("{:?}", splitter_state);
         debug!("{:?}", split_record);
         split_record
     }
 }
 
-#[derive(Debug)]
-struct RecordSplitterState {
-    start_delimiter: Option<char>,
-    end_delimiter: char,
-    current_field: ELBRecordField,
-    next_field: ELBRecordField,
-    start_of_field_index: usize,
-}
-
 const SPACE: char = ' ';
 const DOUBLE_QUOTE: char = '"';
-impl RecordSplitterState {
-    fn new() -> RecordSplitterState {
-        RecordSplitterState {
+lazy_static! {
+    static ref ORDERED_FIELD_SPECS: Vec<ELBRecordFieldParsingSpec> = vec!(
+        ELBRecordFieldParsingSpec {
+            field: ELBRecordField::Timestamp,
             start_delimiter: None,
             end_delimiter: SPACE,
-            // current_field makes debugging a little easier.
-            current_field: ELBRecordField::Timestamp,
-            next_field: ELBRecordField::ELBName,
-            start_of_field_index: 0,
-        }
-    }
+        },
+        ELBRecordFieldParsingSpec {
+            field: ELBRecordField::ELBName,
+            start_delimiter: None,
+            end_delimiter: SPACE,
+        },
+        ELBRecordFieldParsingSpec {
+            field: ELBRecordField::ClientAddress,
+            start_delimiter: None,
+            end_delimiter: SPACE,
+        },
+        ELBRecordFieldParsingSpec {
+            field: ELBRecordField::BackendAddress,
+            start_delimiter: None,
+            end_delimiter: SPACE,
+        },
+        ELBRecordFieldParsingSpec {
+            field: ELBRecordField::RequestProcessingTime,
+            start_delimiter: None,
+            end_delimiter: SPACE,
+        },
+        ELBRecordFieldParsingSpec {
+            field: ELBRecordField::BackendProcessingTime,
+            start_delimiter: None,
+            end_delimiter: SPACE,
+        },
+        ELBRecordFieldParsingSpec {
+            field: ELBRecordField::ResponseProcessingTime,
+            start_delimiter: None,
+            end_delimiter: SPACE,
+        },
+        ELBRecordFieldParsingSpec {
+            field: ELBRecordField::ELBStatusCode,
+            start_delimiter: None,
+            end_delimiter: SPACE,
+        },
+        ELBRecordFieldParsingSpec {
+            field: ELBRecordField::BackendStatusCode,
+            start_delimiter: None,
+            end_delimiter: SPACE,
+        },
+        ELBRecordFieldParsingSpec {
+            field: ELBRecordField::ReceivedBytes,
+            start_delimiter: None,
+            end_delimiter: SPACE,
+        },
+        ELBRecordFieldParsingSpec {
+            field: ELBRecordField::SentBytes,
+            start_delimiter: None,
+            end_delimiter: SPACE,
+        },
+        ELBRecordFieldParsingSpec {
+            field: ELBRecordField::RequestMethod,
+            start_delimiter: Some(DOUBLE_QUOTE),
+            end_delimiter: SPACE,
+        },
+        ELBRecordFieldParsingSpec {
+            field: ELBRecordField::RequestURL,
+            start_delimiter: None,
+            end_delimiter: SPACE,
+        },
+        ELBRecordFieldParsingSpec {
+            field: ELBRecordField::RequestHTTPVersion,
+            start_delimiter: None,
+            end_delimiter: DOUBLE_QUOTE,
+        },
+        ELBRecordFieldParsingSpec {
+            field: ELBRecordField::UserAgent,
+            start_delimiter: Some(DOUBLE_QUOTE),
+            end_delimiter: DOUBLE_QUOTE,
+        },
+        ELBRecordFieldParsingSpec {
+            field: ELBRecordField::SSLCipher,
+            start_delimiter: Some(SPACE),
+            end_delimiter: SPACE,
+        },
+        ELBRecordFieldParsingSpec {
+            field: ELBRecordField::SSLProtocol,
+            start_delimiter: None,
+            end_delimiter: SPACE,
+        },
+    );
+}
 
-    fn next(&mut self) {
-        self.current_field = self.next_field;
-        match self.current_field {
-            ELBRecordField::Timestamp => {},
-            ELBRecordField::ELBName => self.next_field = ELBRecordField::ClientAddress,
-            ELBRecordField::ClientAddress => self.next_field = ELBRecordField::BackendAddress,
-            ELBRecordField::BackendAddress => {
-                self.next_field = ELBRecordField::RequestProcessingTime
-            }
-            ELBRecordField::RequestProcessingTime => {
-                self.next_field = ELBRecordField::BackendProcessingTime
-            }
-            ELBRecordField::BackendProcessingTime => {
-                self.next_field = ELBRecordField::ResponseProcessingTime
-            }
-            ELBRecordField::ResponseProcessingTime => {
-                self.next_field = ELBRecordField::ELBStatusCode
-            }
-            ELBRecordField::ELBStatusCode => self.next_field = ELBRecordField::BackendStatusCode,
-            ELBRecordField::BackendStatusCode => self.next_field = ELBRecordField::ReceivedBytes,
-            ELBRecordField::ReceivedBytes => self.next_field = ELBRecordField::SentBytes,
-            ELBRecordField::SentBytes => self.next_field = ELBRecordField::RequestMethod,
-            ELBRecordField::RequestMethod => {
-                self.start_delimiter = Some(DOUBLE_QUOTE);
-                self.end_delimiter = SPACE;
-                self.next_field = ELBRecordField::RequestURL;
-            }
-            ELBRecordField::RequestURL => {
-                self.end_delimiter = SPACE;
-                self.next_field = ELBRecordField::RequestHTTPVersion;
-            }
-            ELBRecordField::RequestHTTPVersion => {
-                self.end_delimiter = DOUBLE_QUOTE;
-                self.next_field = ELBRecordField::UserAgent;
-            }
-            ELBRecordField::UserAgent => {
-                self.start_delimiter = Some(DOUBLE_QUOTE);
-                self.end_delimiter = DOUBLE_QUOTE;
-                self.next_field = ELBRecordField::SSLCipher;
-            }
-            ELBRecordField::SSLCipher => {
-                self.start_delimiter = Some(SPACE);
-                self.end_delimiter = SPACE;
-                self.next_field = ELBRecordField::SSLProtocol;
-            }
-            ELBRecordField::SSLProtocol => {
-                self.end_delimiter = SPACE;
-                self.next_field = ELBRecordField::RequestHTTPVersion;
-            }
-        }
-    }
+#[derive(Debug)]
+struct ELBRecordFieldParsingSpec {
+    field: ELBRecordField,
+    start_delimiter: Option<char>,
+    end_delimiter: char,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
