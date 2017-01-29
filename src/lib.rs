@@ -272,13 +272,17 @@ impl RecordSplitter for str {
         let mut split_record: Vec<&str> = Vec::with_capacity(ELB_RECORD_V2_FIELD_COUNT);
         let mut splitter_state = RecordSplitterState::new();
         for (current_idx, current_char) in self.trim_left().char_indices() {
-            if splitter_state.start_delimiter.map(|sd| current_char == sd).unwrap_or(false) {
-                splitter_state.start_of_field_index = current_idx + 1;
-                splitter_state.start_delimiter = None;
-            } else if splitter_state.start_delimiter.is_none() && current_char == splitter_state.end_delimiter {
-                split_record.push(&self[splitter_state.start_of_field_index..current_idx]);
-                splitter_state.start_of_field_index = current_idx + 1;
-                splitter_state.next();
+            match splitter_state.start_delimiter {
+                None if current_char == splitter_state.end_delimiter => {
+                    split_record.push(&self[splitter_state.start_of_field_index..current_idx]);
+                    splitter_state.start_of_field_index = current_idx + 1;
+                    splitter_state.next();
+                },
+                Some(sd) if current_char == sd => {
+                    splitter_state.start_of_field_index = current_idx + 1;
+                    splitter_state.start_delimiter = None;
+                },
+                _ => {}
             }
         }
 
@@ -319,7 +323,7 @@ impl RecordSplitterState {
     fn next(&mut self) {
         self.current_field = self.next_field;
         match self.current_field {
-            ELBRecordField::Timestamp => self.next_field = ELBRecordField::ELBName,
+            ELBRecordField::Timestamp => {},
             ELBRecordField::ELBName => self.next_field = ELBRecordField::ClientAddress,
             ELBRecordField::ClientAddress => self.next_field = ELBRecordField::BackendAddress,
             ELBRecordField::BackendAddress => {
