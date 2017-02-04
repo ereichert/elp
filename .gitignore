@@ -2,3 +2,4 @@ target
 Cargo.lock
 aws_test_dir/
 .idea/
+src/lib.rs.bk
