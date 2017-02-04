@@ -48,7 +48,7 @@ pub type ParsingResult<'a> = Result<ELBRecord<'a>, ParsingErrors<'a>>;
 /// parse all of the fields of an ELB record.  An error is returned for each field that was not
 /// parsable to make it clear what fields of the record were faulty and allow the user to decide
 /// how to handle the failure.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ParsingErrors<'a> {
     /// The raw record.
     pub record: &'a str,
