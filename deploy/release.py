@@ -82,7 +82,7 @@ def release(
 
     print "Committed release v{} to {}.".format(str(release_version), release_context.repo_active_branch())
 
-    tag = "counter-{}".format(str(release_version))
+    tag = "{}-{}".format(package_name, str(release_version))
     if not release_context.dry_run:
         release_context.tag_release(tag, tag)
 
