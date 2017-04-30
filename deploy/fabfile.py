@@ -25,10 +25,18 @@ def release_snapshot():
 
 
 def run_release(release_type):
-    # TODO Create the release context here
-    # TODO pass the new context to release.
+    release_context = ReleaseContext(
+        PROJECT_ROOT,
+        release_type,
+        "{}/Cargo.toml".format(PROJECT_ROOT),
+        "{}/src/version.txt".format(PROJECT_ROOT),
+        "{}/CHANGELOG.md".format(PROJECT_ROOT),
+        False,
+        False,
+        True
+    )
     # TODO Split the next version code into a separate method
-    release(release_type, dry_run=False)
+    release(release_context)
     package()
     print("Publishing {} to crates.io.", package_path)
     publish()

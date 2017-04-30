@@ -27,26 +27,7 @@ BRANCH_TEST_DEVELOP = "testdevelop"
 
 @runs_once
 @task
-def release(
-        release_type="",
-        cargo_file="{}/Cargo.toml".format(PROJECT_ROOT),
-        version_file="{}/src/version.txt".format(PROJECT_ROOT),
-        changelog_file="{}/CHANGELOG.md".format(PROJECT_ROOT),
-        disable_checks=False,
-        dry_run=True,
-        run_build=True
-):
-    release_context = ReleaseContext(
-        PROJECT_ROOT,
-        release_type,
-        cargo_file,
-        version_file,
-        changelog_file,
-        _prep_bool_arg(disable_checks),
-        _prep_bool_arg(dry_run),
-        _prep_bool_arg(run_build)
-    )
-
+def release(release_context):
     if not release_context.dry_run:
         print("*** You are about to do a release. This is not a dry run. ***")
         resp = _prep_bool_arg(raw_input('Confirm [Y/N]: '))
