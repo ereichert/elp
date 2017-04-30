@@ -79,9 +79,10 @@ def release(release_context):
 @task
 def bump_version(release_context):
     starting_version, package_name = read_cargo_file(release_context)
+    starting_sem_ver = semantic_version.Version(starting_version)
 
     if release_context.is_snapshot_release():
-        snapshot_version = to_snapshot_version(starting_version)
+        snapshot_version = to_snapshot_version(starting_sem_ver)
         update_version_in_files(release_context, snapshot_version)
         print("Updated files with SNAPSHOT specifier.")
         if not release_context.dry_run:
@@ -91,7 +92,7 @@ def bump_version(release_context):
         release_context.checkout_test_master()
         release_context.merge_test_develop()
         release_context.checkout_test_develop()
-        next_version = to_next_patch_snapshot_version(starting_version)
+        next_version = to_next_patch_snapshot_version(starting_sem_ver)
         update_version_in_files(release_context, next_version)
         print("Updated files with SNAPSHOT specifier.")
         if not release_context.dry_run:
@@ -101,7 +102,7 @@ def bump_version(release_context):
         release_context.checkout_master()
         release_context.merge_develop()
         release_context.checkout_develop()
-        next_version = to_next_patch_snapshot_version(starting_version)
+        next_version = to_next_patch_snapshot_version(starting_sem_ver)
         update_version_in_files(release_context, next_version)
         print("Updated files with SNAPSHOT specifier.")
         if not release_context.dry_run:
