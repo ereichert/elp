@@ -19,7 +19,7 @@ Add ELP as a dependency.  Add the following to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-elp = "1.0.0"
+elp = "2.0.0"
 ```
 Then reference it as an external crate in your code.
 
@@ -27,53 +27,29 @@ Then reference it as an external crate in your code.
 extern crate elp;
 ```
 
-Here's a short program that uses an ELP utility method to get the paths of all
-of the ELB access logs in a directory (recursively) and write the results of parsing
-them to stdout.
+Here's a short (incomplete, probably buggy) program that uses ELP to parse all of the records in a file.
 
 ```rust
 extern crate elp;
 
 fn main() {
-  let mut filenames = Vec::new();
-
-  // Get a list of files from a directory specified by the user.
-  match elp::file_list(log_location, &mut filenames) {
-      // If walking the directory succeeds
-      Ok(_) => {
-          // Attempt to parse each record in each file passing the result to
-          // a user defined result handler.
-          elp::process_files(&filenames, &mut |parsing_result: ParsingResult| {
-              println!("{:?}", parsing_result);
-          });
-
-          std::process::exit(0);
-      },
-
-      Err(e) => {
-          println!("The following error occurred while trying to get the list of files. {}", e);
-          std::process::exit(1);
-      },
+  match File::open(some_path) {
+    Ok(file) => {
+        for possible_record in BufReader::new(file).lines() {
+            // See http://ereichert.github.io/elp/elp/type.ParsingResult.html
+            if let Ok(record) = elp::parse_record(possible_record) {
+                // handle ELBRecord
+            } else {
+                // handle ParsingErrors
+            }
+        };
+    }
+    Err(err) => {} //handle io::Error
+  }
 }
 ```
 
-Most of this is pretty standard Rust code.  The only ELP specific code of note
-is the handler.
+Most of this is pretty standard Rust code.  The only ELP specific code of note is the elp::parse_record call.
 
-An attempt is made to parse every record.  The results of the attempt to parse
-each record is passed to a user defined handler having the following function
-signature.
-
-```rust
-FnMut(ParsingResult) -> ()
-```
-
-It's up to the user to check for errors.
-
-Why a handler and not return a Vec or some other collection of ELBRecord?
-
-If you run an ELB with heavy traffic you can easily produce millions of records
-per day.  Storing the records in memory and returning them is not viable for
-high load ELB.  By providing a handler to which each record will be passed the
-user can decide how to handle each record whether it be storing it in memory or
-writing them to disk.
+An attempt is made to parse each field independently. The ParsingErrors struct includes a list of the fields that could 
+not be parsed and, if possible, the reason they could not be parsed.
