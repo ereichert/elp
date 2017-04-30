@@ -35,12 +35,11 @@ def run_release(release_type):
         False,
         True
     )
-    # TODO Split the next version code into a separate method
     release(release_context)
     package()
     print("Publishing {} to crates.io.", package_path)
     publish()
-    # TODO Call the next version method here passing it the release context.
+    bump_version(release_context)
 
 
 @runs_once

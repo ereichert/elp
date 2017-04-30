@@ -33,6 +33,7 @@ def release(release_context):
         resp = _prep_bool_arg(raw_input('Confirm [Y/N]: '))
         if not resp:
             fabric.utils.abort("Release aborted.")
+
     if release_context.release_type not in RELEASE_TYPES:
         fabric.utils.abort("You must specify the release type: [snapshot xor final xor testfinal]")
 
@@ -41,7 +42,7 @@ def release(release_context):
             release_context.repo_active_branch()))
 
     if not release_context.disable_checks and release_context.repo_is_dirty():
-        fabric.utils.abort("There are uncommitted changes on the active branch.")
+        fabric.utils.abort("There are uncommitted changes on the develop branch.")
 
     if release_context.is_test_final_release():
         release_context.checkout_test_develop()
@@ -69,8 +70,18 @@ def release(release_context):
 
     print "Tagged release v{} to {}.".format(str(release_version), release_context.repo_active_branch())
 
+    if not release_context.dry_run:
+        print "Pushing release to origin."
+        release_context.push_to_origin()
+
+
+@runs_once
+@task
+def bump_version(release_context):
+    starting_version, package_name = read_cargo_file(release_context)
+
     if release_context.is_snapshot_release():
-        snapshot_version = to_snapshot_version(release_version)
+        snapshot_version = to_snapshot_version(starting_version)
         update_version_in_files(release_context, snapshot_version)
         print("Updated files with SNAPSHOT specifier.")
         if not release_context.dry_run:
@@ -80,7 +91,7 @@ def release(release_context):
         release_context.checkout_test_master()
         release_context.merge_test_develop()
         release_context.checkout_test_develop()
-        next_version = to_next_patch_snapshot_version(release_version)
+        next_version = to_next_patch_snapshot_version(starting_version)
         update_version_in_files(release_context, next_version)
         print("Updated files with SNAPSHOT specifier.")
         if not release_context.dry_run:
@@ -90,7 +101,7 @@ def release(release_context):
         release_context.checkout_master()
         release_context.merge_develop()
         release_context.checkout_develop()
-        next_version = to_next_patch_snapshot_version(release_version)
+        next_version = to_next_patch_snapshot_version(starting_version)
         update_version_in_files(release_context, next_version)
         print("Updated files with SNAPSHOT specifier.")
         if not release_context.dry_run:
