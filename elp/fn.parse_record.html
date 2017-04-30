@@ -9,12 +9,15 @@
 
     <title>elp::parse_record - Rust</title>
 
+    <link rel="stylesheet" type="text/css" href="../normalize.css">
+    <link rel="stylesheet" type="text/css" href="../rustdoc.css">
     <link rel="stylesheet" type="text/css" href="../main.css">
+    
 
     
     
 </head>
-<body class="rustdoc">
+<body class="rustdoc fn">
     <!--[if lte IE 8]>
     <div class="warning">
         This old browser is unsupported and will most likely display funky
@@ -40,14 +43,13 @@
         </form>
     </nav>
 
-    <section id='main' class="content fn">
-<h1 class='fqn'><span class='in-band'>Function <a href='index.html'>elp</a>::<wbr><a class='fn' href=''>parse_record</a></span><span class='out-of-band'><span id='render-detail'>
-            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
-                [<span class='inner'>&#x2212;</span>]
-            </a>
-        </span><a id='src-165' class='srclink' href='../src/elp/lib.rs.html#189-257' title='goto source code'>[src]</a></span></h1>
-<pre class='rust fn'>pub fn parse_record(record: <a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>) -&gt; <a class='type' href='../elp/type.ParsingResult.html' title='elp::ParsingResult'>ParsingResult</a></pre><div class='docblock'><p>Attempt to parse a single string into an ELB record.</p>
-
+    <section id='main' class="content">
+<h1 class='fqn'><span class='in-band'>Function <a href='index.html'>elp</a>::<wbr><a class="fn" href=''>parse_record</a></span><span class='out-of-band'><span id='render-detail'>
+                   <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                       [<span class='inner'>&#x2212;</span>]
+                   </a>
+               </span><a class='srclink' href='../src/elp/lib.rs.html#102-163' title='goto source code'>[src]</a></span></h1>
+<pre class='rust fn'>pub fn parse_record(record: &amp;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>) -&gt; <a class="type" href="../elp/type.ParsingResult.html" title="type elp::ParsingResult">ParsingResult</a></pre><div class='docblock'><p>Attempt to parse a single string into an ELB record.</p>
 <p>This is the main parsing algorithm.  It will attempt to parse every field that is supposed to
 be in an ELB Access log record.  If it successful it will return an <code>Ok(ELBRecord)</code>.  If not,
 it will return a <code>Err(ParsingErrors)</code>.</p>
@@ -74,6 +76,8 @@ it will return a <code>Err(ParsingErrors)</code>.</p>
                     <dd>Move down in search results</dd>
                     <dt>&#9166;</dt>
                     <dd>Go to active search result</dd>
+                    <dt>+</dt>
+                    <dd>Collapse/expand all sections</dd>
                 </dl>
             </div>
 
@@ -94,7 +98,7 @@ it will return a <code>Err(ParsingErrors)</code>.</p>
 
                 <p>
                     Search functions by type signature (e.g.
-                    <code>vec -> usize</code>)
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
                 </p>
             </div>
         </div>
@@ -105,11 +109,9 @@ it will return a <code>Err(ParsingErrors)</code>.</p>
     <script>
         window.rootPath = "../";
         window.currentCrate = "elp";
-        window.playgroundUrl = "";
     </script>
     <script src="../jquery.js"></script>
     <script src="../main.js"></script>
-    
-    <script async src="../search-index.js"></script>
+    <script defer src="../search-index.js"></script>
 </body>
 </html>
