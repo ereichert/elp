@@ -1,4 +1,4 @@
-#ELP - AWS ELB Access Log Parser
+# ELP - AWS ELB Access Log Parser
 
 ELP is a simple AWS ELB Access Log parser.  
 
@@ -11,7 +11,7 @@ This project supports the [Rust Code of Conduct](https://www.rust-lang.org/condu
 
 ## [Documentation](http://ereichert.github.io/elp/elp/index.html)
 
-##How To
+## How To
 
 There is a full example of ELP's use in a production environment [here](https://github.com/trafficland/counter).
 
