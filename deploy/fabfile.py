@@ -23,6 +23,22 @@ def release_final():
 def release_snapshot():
     run_release(RELEASE_TYPE_SNAPSHOT)
 
+@runs_once
+@task
+def release_test_final():
+    release_context = ReleaseContext(
+        PROJECT_ROOT,
+        RELEASE_TYPE_TEST_FINAL,
+        "{}/Cargo.toml".format(PROJECT_ROOT),
+        "{}/src/version.txt".format(PROJECT_ROOT),
+        "{}/CHANGELOG.md".format(PROJECT_ROOT),
+        True,
+        True,
+        True
+    )
+    release(release_context)
+    bump_version(release_context)
+
 
 def run_release(release_type):
     release_context = ReleaseContext(
@@ -37,7 +53,7 @@ def run_release(release_type):
     )
     release(release_context)
     package()
-    print("Publishing {} to crates.io.", package_path)
+    print("Publishing to crates.io.")
     publish()
     bump_version(release_context)
 
