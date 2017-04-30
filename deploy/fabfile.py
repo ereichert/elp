@@ -15,20 +15,24 @@ VALID_MODES = ["full", "dryrun"]
 @runs_once
 @task
 def release_final():
-    release(release_type=RELEASE_TYPE_FINAL, dry_run=False)
-    package()
-    print("Publishing {} to crates.io.", package_path)
-    publish()
+    run_release(RELEASE_TYPE_FINAL)
 
 
 @runs_once
 @task
 def release_snapshot():
-    print("Running a snapshot release.")
-    release(release_type=RELEASE_TYPE_SNAPSHOT, dry_run=False)
+    run_release(RELEASE_TYPE_SNAPSHOT)
+
+
+def run_release(release_type):
+    # TODO Create the release context here
+    # TODO pass the new context to release.
+    # TODO Split the next version code into a separate method
+    release(release_type, dry_run=False)
     package()
     print("Publishing {} to crates.io.", package_path)
     publish()
+    # TODO Call the next version method here passing it the release context.
 
 
 @runs_once
