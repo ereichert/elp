@@ -9,6 +9,8 @@ for more information about them.
 
 This project supports the [Rust Code of Conduct](https://www.rust-lang.org/conduct.html).
 
+## [Documentation](http://ereichert.github.io/elp/elp/index.html)
+
 ##How To
 
 There is a full example of ELP's use in a production environment [here](https://github.com/trafficland/counter).
@@ -17,7 +19,7 @@ Add ELP as a dependency.  Add the following to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-elp = "0.99.0"
+elp = "1.0.0"
 ```
 Then reference it as an external crate in your code.
 

@@ -1,3 +1,7 @@
 target
 Cargo.lock
-aws_test_dir/
+.idea/
+*rs.bk
+deploy/fab_files
+*.pyc
+*.log

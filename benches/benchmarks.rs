@@ -1,9 +1,8 @@
 #![feature(test)]
 extern crate test;
-extern crate aws_abacus;
+extern crate elp;
 
 use test::Bencher;
-use aws_abacus::elb_log_files;
 
 const TEST_LINE: &'static str = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
 172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 7582 \
@@ -12,5 +11,5 @@ const TEST_LINE: &'static str = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6
 
 #[bench]
 fn bench_parse_line(b: &mut Bencher) {
-    b.iter(|| elb_log_files::parse_record(TEST_LINE.to_string()).unwrap());
+    b.iter(|| elp::parse_record(TEST_LINE).unwrap());
 }
