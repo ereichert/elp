@@ -51,5 +51,5 @@ fn main() {
 
 Most of this is pretty standard Rust code.  The only ELP specific code of note is the elp::parse_record call.
 
-An attempt is made to parse each field independently. The ParsingErrors struct includes a list of the fields that could 
+An attempt is made to parse each field independently. The ParsingErrors struct includes a list of the fields that could
 not be parsed and, if possible, the reason they could not be parsed.
