@@ -1,6 +1,6 @@
 # ELP - AWS ELB Access Log Parser
 
-ELP is a simple AWS ELB Access Log parser.  
+ELP is a simple AWS ELB Access Log parser.
 
 See the [access log docs](http://docs.aws.amazon.com/ElasticLoadBalancing/latest/DeveloperGuide/access-log-collection.html)
 for more information about them.
