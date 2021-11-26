@@ -174,7 +174,7 @@ impl RecordSplitter for str {
         let mut current_start_delim = current_field_spec.start_delimiter;
         let mut start_of_field_index = 0;
 
-        for (current_idx, current_char) in self.trim_left().char_indices() {
+        for (current_idx, current_char) in self.trim_start().char_indices() {
             match current_start_delim {
                 None if current_char == current_field_spec.end_delimiter => {
                     split_record.push(&self[start_of_field_index..current_idx]);
@@ -379,7 +379,7 @@ impl<'a> ELBRecordFieldParser for Vec<&'a str> {
             Err(e) => {
                 errors.push(ELBRecordParsingError::ParsingError {
                     field_name: field_name,
-                    description: e.description().to_owned(),
+                    description: e.to_string(),
                 });
                 None
             }
