@@ -16,7 +16,7 @@ use std::ops::Index;
 // selected by me to bring some sanity to the various formats.
 const ELB_RECORD_V1_FIELD_COUNT: usize = 14;
 const ELB_RECORD_V2_FIELD_COUNT: usize = 17;
-const UNDEFINED_CHAR: &'static str = "-";
+const UNDEFINED_CHAR: &str = "-";
 
 /// The product of parsing a single AWS ELB log record.
 #[derive(Debug)]
@@ -106,8 +106,8 @@ pub fn parse_record(record: &str) -> ParsingResult {
     if split_len != ELB_RECORD_V1_FIELD_COUNT && split_len != ELB_RECORD_V2_FIELD_COUNT {
         errors.push(ELBRecordParsingError::MalformedRecord);
         return Err(ParsingErrors {
-            record: record,
-            errors: errors,
+            record,
+            errors,
         });
     }
 
@@ -150,14 +150,14 @@ pub fn parse_record(record: &str) -> ParsingResult {
             request_method: split_record[ELBRecordField::RequestMethod],
             request_url: split_record[ELBRecordField::RequestURL],
             request_http_version: split_record[ELBRecordField::RequestHTTPVersion],
-            user_agent: user_agent,
-            ssl_cipher: ssl_cipher,
-            ssl_protocol: ssl_protocol,
+            user_agent,
+            ssl_cipher,
+            ssl_protocol,
         })
     } else {
         Err(ParsingErrors {
-            record: record,
-            errors: errors,
+            record,
+            errors,
         })
     }
 }
@@ -378,7 +378,7 @@ impl<'a> ELBRecordFieldParser for Vec<&'a str> {
 
             Err(e) => {
                 errors.push(ELBRecordParsingError::ParsingError {
-                    field_name: field_name,
+                    field_name,
                     description: e.to_string(),
                 });
                 None
@@ -394,12 +394,12 @@ mod parse_record_tests {
     use super::ELBRecordField;
     use super::UNDEFINED_CHAR;
 
-    const V1_TEST_RECORD: &'static str = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
+    const V1_TEST_RECORD: &str = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
     172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 7582 \
     \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
     ";
 
-    const V2_TEST_RECORD: &'static str =
+    const V2_TEST_RECORD: &str =
         "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 172.16.1.5:9000 0.000039 0.145507 \
          0.00003 200 200 0 7582 \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 \
          HTTP/1.1\" \"Mozilla/5.0 (cloud; like Mac OS X; en-us) AppleWebKit/537.36.0 (KHTML, like \
