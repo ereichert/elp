@@ -389,28 +389,17 @@ impl<'a> ELBRecordFieldParser for Vec<&'a str> {
 
 #[cfg(test)]
 mod parse_record_tests {
-    use super::parse_record;
-    use super::ELBRecordField;
-    use super::ELBRecordParsingError;
-    use super::UNDEFINED_CHAR;
+    use crate::{parse_record, ELBRecordField, ELBRecordParsingError};
 
-    const V1_TEST_RECORD: &str = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
-    172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 7582 \
-    \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
-    ";
-
-    const V2_TEST_RECORD: &str =
-        "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 172.16.1.5:9000 0.000039 0.145507 \
-         0.00003 200 200 0 7582 \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 \
-         HTTP/1.1\" \"Mozilla/5.0 (cloud; like Mac OS X; en-us) AppleWebKit/537.36.0 (KHTML, like \
-         Gecko) Version/4.0.4 Mobile/7B334b Safari/537.36.0\" some_ssl_cipher some_ssl_protocol";
+    const V1_TEST_RECORD: &str = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 7582 \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"";
+    const V2_TEST_RECORD: &str = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 7582 \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\" \"Mozilla/5.0 (cloud; like Mac OS X; en-us) AppleWebKit/537.36.0 (KHTML, like Gecko) Version/4.0.4 Mobile/7B334b Safari/537.36.0\" some_ssl_cipher some_ssl_protocol";
 
     #[test]
     fn returns_a_record_with_the_ssl_protocol_set_to_a_not_available_symbol_when_it_is_not_present()
     {
         let elb_record = parse_record(V1_TEST_RECORD).unwrap();
 
-        assert_eq!(elb_record.ssl_protocol, UNDEFINED_CHAR)
+        assert_eq!(elb_record.ssl_protocol, "-")
     }
 
     #[test]
@@ -424,7 +413,7 @@ mod parse_record_tests {
     fn returns_a_record_with_the_ssl_cipher_set_to_a_not_available_symbol_when_it_is_not_present() {
         let elb_record = parse_record(V1_TEST_RECORD).unwrap();
 
-        assert_eq!(elb_record.ssl_cipher, UNDEFINED_CHAR)
+        assert_eq!(elb_record.ssl_cipher, "-")
     }
 
     #[test]
@@ -438,7 +427,7 @@ mod parse_record_tests {
     fn returns_a_record_with_the_user_agent_set_to_a_not_available_symbol_when_it_is_not_present() {
         let elb_record = parse_record(V1_TEST_RECORD).unwrap();
 
-        assert_eq!(elb_record.user_agent, UNDEFINED_CHAR)
+        assert_eq!(elb_record.user_agent, "-")
     }
 
     #[test]
