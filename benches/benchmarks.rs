@@ -1,6 +1,6 @@
 #![feature(test)]
-extern crate test;
 extern crate elp;
+extern crate test;
 
 use test::Bencher;
 
