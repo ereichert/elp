@@ -1,16 +1,13 @@
-extern crate chrono;
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate lazy_static;
-
-use self::chrono::{DateTime, UTC};
 use std::error::Error;
 use std::str::FromStr;
 use std::net::SocketAddrV4;
 use std::fmt::{Display, Formatter};
 use std::fmt;
 use std::ops::Index;
+
+use chrono::{DateTime, UTC};
+use log::debug;
+use lazy_static::lazy_static;
 
 // AWS doesn't version their log file format so these version numbers were
 // selected by me to bring some sanity to the various formats.
