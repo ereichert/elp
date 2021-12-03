@@ -6,7 +6,6 @@ use std::ops::Index;
 use std::str::FromStr;
 
 use chrono::{DateTime, UTC};
-use log::debug;
 
 // AWS doesn't version their log file format so these version numbers were
 // selected by me to bring some sanity to the various formats.
@@ -193,7 +192,6 @@ impl RecordSplitter for str {
             split_record.push(x);
         }
 
-        debug!("{:?}", split_record);
         split_record
     }
 }

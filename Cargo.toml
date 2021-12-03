@@ -12,7 +12,6 @@ license = "Apache-2.0"
 
 [dependencies]
 chrono = "0.2.19"
-log = "0.4.14"
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }
