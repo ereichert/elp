@@ -6,7 +6,6 @@ use std::ops::Index;
 use std::str::FromStr;
 
 use chrono::{DateTime, UTC};
-use lazy_static::lazy_static;
 use log::debug;
 
 // AWS doesn't version their log file format so these version numbers were
@@ -201,95 +200,93 @@ impl RecordSplitter for str {
 
 const SPACE: char = ' ';
 const DOUBLE_QUOTE: char = '"';
-lazy_static! {
-    static ref ORDERED_FIELD_SPECS: Vec<ELBRecordFieldParsingSpec> = vec!(
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::Timestamp,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::ELBName,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::ClientAddress,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::BackendAddress,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::RequestProcessingTime,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::BackendProcessingTime,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::ResponseProcessingTime,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::ELBStatusCode,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::BackendStatusCode,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::ReceivedBytes,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::SentBytes,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::RequestMethod,
-            start_delimiter: Some(DOUBLE_QUOTE),
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::RequestURL,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::RequestHTTPVersion,
-            start_delimiter: None,
-            end_delimiter: DOUBLE_QUOTE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::UserAgent,
-            start_delimiter: Some(DOUBLE_QUOTE),
-            end_delimiter: DOUBLE_QUOTE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::SSLCipher,
-            start_delimiter: Some(SPACE),
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::SSLProtocol,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-    );
-}
+const ORDERED_FIELD_SPECS: [ELBRecordFieldParsingSpec; 17] = [
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::Timestamp,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::ELBName,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::ClientAddress,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::BackendAddress,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::RequestProcessingTime,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::BackendProcessingTime,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::ResponseProcessingTime,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::ELBStatusCode,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::BackendStatusCode,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::ReceivedBytes,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::SentBytes,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::RequestMethod,
+        start_delimiter: Some(DOUBLE_QUOTE),
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::RequestURL,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::RequestHTTPVersion,
+        start_delimiter: None,
+        end_delimiter: DOUBLE_QUOTE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::UserAgent,
+        start_delimiter: Some(DOUBLE_QUOTE),
+        end_delimiter: DOUBLE_QUOTE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::SSLCipher,
+        start_delimiter: Some(SPACE),
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::SSLProtocol,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+];
 
 #[derive(Debug)]
 struct ELBRecordFieldParsingSpec {
