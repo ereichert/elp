@@ -1,22 +1,17 @@
-extern crate chrono;
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate lazy_static;
-
-use self::chrono::{DateTime, UTC};
 use std::error::Error;
-use std::str::FromStr;
-use std::net::SocketAddrV4;
-use std::fmt::{Display, Formatter};
 use std::fmt;
+use std::fmt::{Display, Formatter};
+use std::net::SocketAddrV4;
 use std::ops::Index;
+use std::str::FromStr;
+
+use chrono::{DateTime, UTC};
 
 // AWS doesn't version their log file format so these version numbers were
 // selected by me to bring some sanity to the various formats.
 const ELB_RECORD_V1_FIELD_COUNT: usize = 14;
 const ELB_RECORD_V2_FIELD_COUNT: usize = 17;
-const UNDEFINED_CHAR: &'static str = "-";
+const UNDEFINED_CHAR: &str = "-";
 
 /// The product of parsing a single AWS ELB log record.
 #[derive(Debug)]
@@ -75,11 +70,15 @@ impl Display for ELBRecordParsingError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match *self {
             ELBRecordParsingError::MalformedRecord => write!(f, "Record is malformed."),
-            ELBRecordParsingError::ParsingError { ref field_name, ref description } => {
-                write!(f,
-                       "Parsing of field {} failed with the following error: {}.",
-                       field_name,
-                       description)
+            ELBRecordParsingError::ParsingError {
+                ref field_name,
+                ref description,
+            } => {
+                write!(
+                    f,
+                    "Parsing of field {} failed with the following error: {}.",
+                    field_name, description
+                )
             }
         }
     }
@@ -105,10 +104,7 @@ pub fn parse_record(record: &str) -> ParsingResult {
     let split_len = split_record.len();
     if split_len != ELB_RECORD_V1_FIELD_COUNT && split_len != ELB_RECORD_V2_FIELD_COUNT {
         errors.push(ELBRecordParsingError::MalformedRecord);
-        return Err(ParsingErrors {
-            record: record,
-            errors: errors,
-        });
+        return Err(ParsingErrors { record, errors });
     }
 
     let ts = split_record.parse_field(ELBRecordField::Timestamp, &mut errors);
@@ -124,10 +120,11 @@ pub fn parse_record(record: &str) -> ParsingResult {
     let bytes_received = split_record.parse_field(ELBRecordField::ReceivedBytes, &mut errors);
     let bytes_sent = split_record.parse_field(ELBRecordField::SentBytes, &mut errors);
     let (user_agent, ssl_cipher, ssl_protocol) = if split_len == ELB_RECORD_V2_FIELD_COUNT {
-        (split_record[ELBRecordField::UserAgent],
-         split_record[ELBRecordField::SSLCipher],
-         split_record[ELBRecordField::SSLProtocol])
-
+        (
+            split_record[ELBRecordField::UserAgent],
+            split_record[ELBRecordField::SSLCipher],
+            split_record[ELBRecordField::SSLProtocol],
+        )
     } else {
         (UNDEFINED_CHAR, UNDEFINED_CHAR, UNDEFINED_CHAR)
     };
@@ -150,15 +147,12 @@ pub fn parse_record(record: &str) -> ParsingResult {
             request_method: split_record[ELBRecordField::RequestMethod],
             request_url: split_record[ELBRecordField::RequestURL],
             request_http_version: split_record[ELBRecordField::RequestHTTPVersion],
-            user_agent: user_agent,
-            ssl_cipher: ssl_cipher,
-            ssl_protocol: ssl_protocol,
+            user_agent,
+            ssl_cipher,
+            ssl_protocol,
         })
     } else {
-        Err(ParsingErrors {
-            record: record,
-            errors: errors,
-        })
+        Err(ParsingErrors { record, errors })
     }
 }
 
@@ -174,7 +168,7 @@ impl RecordSplitter for str {
         let mut current_start_delim = current_field_spec.start_delimiter;
         let mut start_of_field_index = 0;
 
-        for (current_idx, current_char) in self.trim_left().char_indices() {
+        for (current_idx, current_char) in self.trim_start().char_indices() {
             match current_start_delim {
                 None if current_char == current_field_spec.end_delimiter => {
                     split_record.push(&self[start_of_field_index..current_idx]);
@@ -198,102 +192,99 @@ impl RecordSplitter for str {
             split_record.push(x);
         }
 
-        debug!("{:?}", split_record);
         split_record
     }
 }
 
 const SPACE: char = ' ';
 const DOUBLE_QUOTE: char = '"';
-lazy_static! {
-    static ref ORDERED_FIELD_SPECS: Vec<ELBRecordFieldParsingSpec> = vec!(
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::Timestamp,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::ELBName,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::ClientAddress,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::BackendAddress,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::RequestProcessingTime,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::BackendProcessingTime,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::ResponseProcessingTime,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::ELBStatusCode,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::BackendStatusCode,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::ReceivedBytes,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::SentBytes,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::RequestMethod,
-            start_delimiter: Some(DOUBLE_QUOTE),
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::RequestURL,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::RequestHTTPVersion,
-            start_delimiter: None,
-            end_delimiter: DOUBLE_QUOTE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::UserAgent,
-            start_delimiter: Some(DOUBLE_QUOTE),
-            end_delimiter: DOUBLE_QUOTE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::SSLCipher,
-            start_delimiter: Some(SPACE),
-            end_delimiter: SPACE,
-        },
-        ELBRecordFieldParsingSpec {
-            field: ELBRecordField::SSLProtocol,
-            start_delimiter: None,
-            end_delimiter: SPACE,
-        },
-    );
-}
+const ORDERED_FIELD_SPECS: [ELBRecordFieldParsingSpec; 17] = [
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::Timestamp,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::ELBName,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::ClientAddress,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::BackendAddress,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::RequestProcessingTime,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::BackendProcessingTime,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::ResponseProcessingTime,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::ELBStatusCode,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::BackendStatusCode,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::ReceivedBytes,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::SentBytes,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::RequestMethod,
+        start_delimiter: Some(DOUBLE_QUOTE),
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::RequestURL,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::RequestHTTPVersion,
+        start_delimiter: None,
+        end_delimiter: DOUBLE_QUOTE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::UserAgent,
+        start_delimiter: Some(DOUBLE_QUOTE),
+        end_delimiter: DOUBLE_QUOTE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::SSLCipher,
+        start_delimiter: Some(SPACE),
+        end_delimiter: SPACE,
+    },
+    ELBRecordFieldParsingSpec {
+        field: ELBRecordField::SSLProtocol,
+        start_delimiter: None,
+        end_delimiter: SPACE,
+    },
+];
 
 #[derive(Debug)]
 struct ELBRecordFieldParsingSpec {
@@ -356,21 +347,25 @@ impl Display for ELBRecordField {
 }
 
 trait ELBRecordFieldParser {
-    fn parse_field<T>(&self,
-                      field_name: ELBRecordField,
-                      errors: &mut Vec<ELBRecordParsingError>)
-                      -> Option<T>
-        where T: FromStr,
-              T::Err: Error + 'static;
+    fn parse_field<T>(
+        &self,
+        field_name: ELBRecordField,
+        errors: &mut Vec<ELBRecordParsingError>,
+    ) -> Option<T>
+    where
+        T: FromStr,
+        T::Err: Error + 'static;
 }
 
 impl<'a> ELBRecordFieldParser for Vec<&'a str> {
-    fn parse_field<T>(&self,
-                      field_name: ELBRecordField,
-                      errors: &mut Vec<ELBRecordParsingError>)
-                      -> Option<T>
-        where T: FromStr,
-              T::Err: Error + 'static
+    fn parse_field<T>(
+        &self,
+        field_name: ELBRecordField,
+        errors: &mut Vec<ELBRecordParsingError>,
+    ) -> Option<T>
+    where
+        T: FromStr,
+        T::Err: Error + 'static,
     {
         let raw_prop = self[field_name];
         match raw_prop.parse::<T>() {
@@ -378,337 +373,11 @@ impl<'a> ELBRecordFieldParser for Vec<&'a str> {
 
             Err(e) => {
                 errors.push(ELBRecordParsingError::ParsingError {
-                    field_name: field_name,
-                    description: e.description().to_owned(),
+                    field_name,
+                    description: e.to_string(),
                 });
                 None
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod parse_record_tests {
-    use super::parse_record;
-    use super::ELBRecordParsingError;
-    use super::ELBRecordField;
-    use super::UNDEFINED_CHAR;
-
-    const V1_TEST_RECORD: &'static str = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
-    172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 7582 \
-    \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
-    ";
-
-    const V2_TEST_RECORD: &'static str =
-        "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 172.16.1.5:9000 0.000039 0.145507 \
-         0.00003 200 200 0 7582 \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 \
-         HTTP/1.1\" \"Mozilla/5.0 (cloud; like Mac OS X; en-us) AppleWebKit/537.36.0 (KHTML, like \
-         Gecko) Version/4.0.4 Mobile/7B334b Safari/537.36.0\" some_ssl_cipher some_ssl_protocol";
-
-    #[test]
-    fn returns_a_record_with_the_ssl_protocol_set_to_a_not_available_symbol_when_it_is_not_present
-        () {
-        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
-
-        assert_eq!(elb_record.ssl_protocol, UNDEFINED_CHAR)
-    }
-
-    #[test]
-    fn returns_a_record_with_the_ssl_protocol_when_it_is_present() {
-        let elb_record = parse_record(V2_TEST_RECORD).unwrap();
-
-        assert_eq!(elb_record.ssl_protocol, "some_ssl_protocol")
-    }
-
-    #[test]
-    fn returns_a_record_with_the_ssl_cipher_set_to_a_not_available_symbol_when_it_is_not_present
-        () {
-        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
-
-        assert_eq!(elb_record.ssl_cipher, UNDEFINED_CHAR)
-    }
-
-    #[test]
-    fn returns_a_record_with_the_ssl_cipher_when_it_is_present() {
-        let elb_record = parse_record(V2_TEST_RECORD).unwrap();
-
-        assert_eq!(elb_record.ssl_cipher, "some_ssl_cipher")
-    }
-
-    #[test]
-    fn returns_a_record_with_the_user_agent_set_to_a_not_available_symbol_when_it_is_not_present
-        () {
-        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
-
-        assert_eq!(elb_record.user_agent, UNDEFINED_CHAR)
-    }
-
-    #[test]
-    fn returns_a_record_with_the_user_agent_when_it_is_present() {
-        let elb_record = parse_record(V2_TEST_RECORD).unwrap();
-
-        assert_eq!(elb_record.user_agent,
-                   "Mozilla/5.0 (cloud; like Mac OS X; en-us) AppleWebKit/537.36.0 (KHTML, like \
-                    Gecko) Version/4.0.4 Mobile/7B334b Safari/537.36.0")
-    }
-
-    #[test]
-    fn returns_a_malformed_record_error_for_records_short_on_values() {
-        let short_record = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
-        172.16.1.5:9000 0.000039 200 200 0 7582 \
-        \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\" \
-        ";
-
-        let malformed_error = parse_record(short_record).unwrap_err().errors.pop();
-
-        assert_eq!(malformed_error,
-                   Some(ELBRecordParsingError::MalformedRecord))
-    }
-
-    #[test]
-    fn returns_a_record_with_the_request_http_version() {
-        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
-
-        assert_eq!(elb_record.request_http_version, "HTTP/1.1")
-    }
-
-    #[test]
-    fn returns_a_record_with_the_request_url() {
-        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
-
-        assert_eq!(elb_record.request_url,
-                   "http://some.domain.com:80/path0/path1?param0=p0&param1=p1")
-    }
-
-    #[test]
-    fn returns_a_record_with_the_request_method() {
-        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
-
-        assert_eq!(elb_record.request_method, "GET")
-    }
-
-    #[test]
-    fn returns_a_record_with_the_sent_bytes() {
-        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
-
-        assert_eq!(elb_record.sent_bytes, 7582)
-    }
-
-    #[test]
-    fn returns_a_parsing_error_referencing_the_sent_bytes_when_the_sent_bytes_is_malformed() {
-        let bad_record = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 172.16.1.5:9000 \
-                          0.000039 0.145507 0.00003 200 200 0 bad_sent_bytes \"GET \
-                          http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"";
-
-        let error_field_name = match parse_record(bad_record).unwrap_err().errors.pop().unwrap() {
-            ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
-            _ => panic!(),
-        };
-
-        assert_eq!(error_field_name, ELBRecordField::SentBytes)
-    }
-
-    #[test]
-    fn returns_a_record_with_the_received_bytes() {
-        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
-
-        assert_eq!(elb_record.received_bytes, 0)
-    }
-
-    #[test]
-    fn returns_a_parsing_error_referencing_the_received_bytes_when_the_received_bytes_is_malformed
-        () {
-        let bad_record = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 172.16.1.5:9000 \
-                          0.000039 0.145507 0.00003 200 200 bad_received_bytes 7582 \"GET \
-                          http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"";
-
-        let error_field_name = match parse_record(bad_record).unwrap_err().errors.pop().unwrap() {
-            ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
-            _ => panic!(),
-        };
-
-        assert_eq!(error_field_name, ELBRecordField::ReceivedBytes)
-    }
-
-    #[test]
-    fn returns_a_record_with_the_backend_status_code() {
-        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
-
-        assert_eq!(elb_record.backend_status_code, 200)
-    }
-
-    #[test]
-    fn returns_a_parsing_error_when_the_backend_status_code_is_malformed() {
-        let bad_record = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 172.16.1.5:9000 \
-                          0.000039 0.145507 0.00003 200 bad_backend_status_code 0 7582 \"GET \
-                          http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"";
-
-        let error_field_name = match parse_record(bad_record).unwrap_err().errors.pop().unwrap() {
-            ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
-            _ => panic!(),
-        };
-
-        assert_eq!(error_field_name, ELBRecordField::BackendStatusCode)
-    }
-
-    #[test]
-    fn returns_a_record_with_the_elb_status_code() {
-        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
-
-        assert_eq!(elb_record.elb_status_code, 200)
-    }
-
-    #[test]
-    fn returns_a_parsing_error_when_the_elb_status_code_is_malformed() {
-        let bad_record = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 172.16.1.5:9000 \
-                          0.000039 0.145507 0.00003 bad_elb_status_code 200 0 7582 \"GET \
-                          http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"";
-
-        let error_field_name = match parse_record(bad_record).unwrap_err().errors.pop().unwrap() {
-            ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
-            _ => panic!(),
-        };
-
-        assert_eq!(error_field_name, ELBRecordField::ELBStatusCode)
-    }
-
-    #[test]
-    fn returns_a_record_with_the_response_processing_time() {
-        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
-
-        assert_eq!(elb_record.response_processing_time, 0.00003)
-    }
-
-    #[test]
-    fn returns_a_parsing_error_when_the_response_processing_time_is_malformed() {
-        let bad_record = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 172.16.1.5:9000 \
-                          0.000039 0.145507 bad_response_processing_time 200 200 0 7582 \"GET \
-                          http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"";
-
-        let error_field_name = match parse_record(bad_record).unwrap_err().errors.pop().unwrap() {
-            ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
-            _ => panic!(),
-        };
-
-        assert_eq!(error_field_name, ELBRecordField::ResponseProcessingTime)
-    }
-
-    #[test]
-    fn returns_a_record_with_the_backend_processing_time() {
-        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
-
-        assert_eq!(elb_record.backend_processing_time, 0.145507)
-    }
-
-    #[test]
-    fn returns_a_parsing_error_when_the_backend_processing_time_is_malformed() {
-        let bad_record = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 172.16.1.5:9000 \
-                          0.000039 bad_backend_processing_time 0.00003 200 200 0 7582 \"GET \
-                          http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"";
-
-        let error_field_name = match parse_record(bad_record).unwrap_err().errors.pop().unwrap() {
-            ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
-            _ => panic!(),
-        };
-
-        assert_eq!(error_field_name, ELBRecordField::BackendProcessingTime)
-    }
-
-    #[test]
-    fn returns_a_record_with_the_request_processing_time() {
-        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
-
-        assert_eq!(elb_record.request_processing_time, 0.000039)
-    }
-
-    #[test]
-    fn returns_a_parsing_error_when_the_request_processing_time_is_malformed() {
-        let bad_record = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 172.16.1.5:9000 \
-                          bad_request_processing_time 0.145507 0.00003 200 200 0 7582 \"GET \
-                          http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"";
-
-        let error_field_name = match parse_record(bad_record).unwrap_err().errors.pop().unwrap() {
-            ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
-            _ => panic!(),
-        };
-
-        assert_eq!(error_field_name, ELBRecordField::RequestProcessingTime)
-    }
-
-    #[test]
-    fn returns_a_record_with_the_backend_address() {
-        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
-
-        assert_eq!(elb_record.backend_address,
-                   "172.16.1.5:9000".parse().unwrap())
-    }
-
-    #[test]
-    fn returns_a_parsing_error_when_the_backend_address_is_malformed() {
-        let bad_record = "2015-08-15T23:43:05.302180Z elb-name 172.16.1.6:54814 \
-        bad_backend_address 0.000039 0.145507 0.00003 200 200 0 7582 \
-        \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
-        ";
-
-        let error_field_name = match parse_record(bad_record).unwrap_err().errors.pop().unwrap() {
-            ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
-            _ => panic!(),
-        };
-
-        assert_eq!(error_field_name, ELBRecordField::BackendAddress)
-    }
-
-    #[test]
-    fn returns_a_record_with_the_client_address() {
-        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
-
-        assert_eq!(elb_record.client_address,
-                   "172.16.1.6:54814".parse().unwrap())
-    }
-
-    #[test]
-    fn returns_a_parsing_error_referencing_the_client_address_when_the_client_address_is_malformed
-        () {
-        let bad_record = "2015-08-15T23:43:05.302180Z elb-name bad_client_address \
-        172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 7582 \
-        \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
-        ";
-
-        let error_field_name = match parse_record(bad_record).unwrap_err().errors.pop().unwrap() {
-            ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
-            _ => panic!(),
-        };
-
-        assert_eq!(error_field_name, ELBRecordField::ClientAddress)
-    }
-
-    #[test]
-    fn returns_a_record_with_the_timestamp() {
-        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
-
-        assert_eq!(format!("{:?}", elb_record.timestamp),
-                   "2015-08-15T23:43:05.302180Z")
-    }
-
-    #[test]
-    fn returns_a_parsing_error_referencing_the_timestamp_when_the_timestamp_is_malformed() {
-        let bad_record = "bad_timestamp elb-name 172.16.1.6:54814 \
-        172.16.1.5:9000 0.000039 0.145507 0.00003 200 200 0 7582 \
-        \"GET http://some.domain.com:80/path0/path1?param0=p0&param1=p1 HTTP/1.1\"\
-        ";
-
-        let error_field_name = match parse_record(bad_record).unwrap_err().errors.pop().unwrap() {
-            ELBRecordParsingError::ParsingError { field_name, .. } => field_name,
-            _ => panic!(),
-        };
-
-        assert_eq!(error_field_name, ELBRecordField::Timestamp)
-    }
-
-    #[test]
-    fn returns_a_record_with_the_elb_name() {
-        let elb_record = parse_record(V1_TEST_RECORD).unwrap();
-
-        assert_eq!(elb_record.elb_name, "elb-name")
     }
 }

@@ -6,7 +6,7 @@ Major rewrite of how the state of the record splitter is maintained.
 
 test bench_parse_line ... bench:       1,296 ns/iter (+/- 99)
 
-01/26/2017 - 
+01/26/2017 -
 
 Minor change to the split_record algorithm
 
